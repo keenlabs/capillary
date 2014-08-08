@@ -15,7 +15,7 @@ Capillary does the following:
 
 At Keen we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
 
-(Capillary action)[http://en.wikipedia.org/wiki/Capillary_action] moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
+[Capillary action](http://en.wikipedia.org/wiki/Capillary_action) moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
 Since Kafka and Storm handle the flow of data (water) through our infrastructure this seems a fitting name!
 
 # Structure
