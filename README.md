@@ -24,7 +24,7 @@ Since Kafka and Storm handle the flow of data (water) through our infrastructure
 
 # Running It
 
-Wanna run it? Awesome! This is a Play Framework app so it works the way all other play apps do:
+Wanna run it? Awesome! This is a [Play Framework](http://www.playframework.com/) app so it works the way all other play apps do:
 
 ```
 $ ./activator
@@ -51,7 +51,23 @@ Then you can hit that URL via your web browser with some args:
 
 `http://127.0.0.1:9000/api/status?toporoot=kendra-write_event-staging&topic=migration-staging`
 
-The args are toporoot (which you should know from your spout configuration) and topic because hopefully you know what you are reading from. :)
+The args are `toporoot` (which you should know from your spout configuration) and `topic` because hopefully you know what you are reading from. :)
+
+## Configuration
+
+By way of [Play](http://www.playframework.com/) Capillary uses [Typesafe Config](https://github.com/typesafehub/config) so you have lots of options.
+
+Most simply you can specify properties when starting the app or include `conf/application-local.conf` at runtime.
+
+There are two configuration options:
+
+### capillary.zookeepers
+
+Set this to a list of your ZKs like every other ZK thingie it uses something like `host1:2181,host2:2181`.
+
+### capillary.kafka.zkroot
+
+If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use '/kafka8' after upgrading from 0.7.
 
 # Other Notes
 
