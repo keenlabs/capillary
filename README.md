@@ -11,6 +11,13 @@ Capillary does the following:
 * Fetches information about the partition's leaders from Zookeeper
 * Fetches information from Kafka about the latest offset from the partitions leaders
 
+# Name
+
+At Keen we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
+
+(Capillary action)[http://en.wikipedia.org/wiki/Capillary_action] moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
+Since Kafka and Storm handle the flow of data (water) through our infrastructure this seems a fitting name!
+
 # Structure
 
 Storm's Kafka spout stores it's committed state in a ZK structure like this:
