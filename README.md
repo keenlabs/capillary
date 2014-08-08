@@ -17,7 +17,7 @@ You can hit `/api/status?toporoot=$TOPOROOT&topic=$TOPIC` to get a JSON output.
 
 # Name
 
-At Keen we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
+At [Keen IO](http://keen.io) we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
 
 [Capillary action](http://en.wikipedia.org/wiki/Capillary_action) moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
 Since Kafka and Storm handle the flow of data (water) through our infrastructure this seems a fitting name!
