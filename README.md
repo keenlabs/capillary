@@ -11,6 +11,10 @@ Capillary does the following:
 * Fetches information about the partition's leaders from Zookeeper
 * Fetches information from Kafka about the latest offset from the partitions leaders
 
+# API
+
+You can hit `/api/status?toporoot=$TOPOROOT&topic=$TOPIC` to get a JSON output.
+
 # Name
 
 At Keen we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
