@@ -3,6 +3,8 @@ deltas of Storm spouts with a Kafka >= 0.8 cluster.
 
 # Overview
 
+![Capillary](/shot.png?raw=true)
+
 Capillary does the following:
 * Takes a spoutroot and topic name from the URL
 * Fetches information about the topic's partitions and offsets from the Storm spout state in Zookeeper
