@@ -17,16 +17,15 @@ object ZkKafka {
   lazy val zk = new ZooKeeperClient(zookeepers)
 
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
+    // There is basically nothing for error checking in here.
 
     val s = zk.getChildren(s"/$root")
-    // println(s.length)
-    // println(s(0))
 
+    // We assume that there's only one child. This might break things
     val parts = zk.getChildren(s"/$root/" + s(0))
 
     // This is here because staging has old and new partition znodes :(
     val validParts = parts.filter { p => p.startsWith("partition") }
-    // println(validParts)
 
     return validParts.map { vp =>
       val jsonState = new String(zk.get(s"/$root/" + s(0) + s"/$vp"))
@@ -34,7 +33,6 @@ object ZkKafka {
       val offset = (state \ "offset").as[Long]
       val partition = (state \ "partition").as[Long]
       val ttopic = (state \ "topic").as[String]
-      // println(s"$ttopic $partition $offset")
       (partition.toInt, offset)
     } toMap
   }
@@ -46,27 +44,24 @@ object ZkKafka {
       val jsonState = new String(zk.get(s"/$kafkaZkRoot/brokers/topics/$topic/partitions/$kp/state"))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
-      // println(s"p: $kp, l: $leader")
 
       val idJson = new String(zk.get(s"/$kafkaZkRoot/brokers/ids/$leader"))
       val leaderState = Json.parse(idJson)
       val host = (leaderState \ "host").as[String]
       val port = (leaderState \ "port").as[Int]
-      // println(s"h: $host, p: $port")
 
-      val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "test-client")
+      val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
       val topicAndPartition = TopicAndPartition(topic, kp.toInt)
       val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
           topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
       )
       val request = new OffsetRequest(
-        requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "test-client")
+        requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
       val response = ks.getOffsetsBefore(request);
       if(response.hasError) {
         println("ERROR!")
       }
       (kp.toInt, response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0))
-      // println(response)
     } toMap
   }
 }

@@ -22,6 +22,42 @@ At Keen we name our projects after plants. Services often use tree or large plan
 [Capillary action](http://en.wikipedia.org/wiki/Capillary_action) moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
 Since Kafka and Storm handle the flow of data (water) through our infrastructure this seems a fitting name!
 
+# Running It
+
+Wanna run it? Awesome! This is a Play Framework app so it works the way all other play apps do:
+
+```
+$ ./activator
+[capillary] $ dist
+… lots of crazy computer talk…
+[info] Done packaging.
+[info]
+[info] Your package is ready in /Users/gphat/src/capillary/target/universal/capillary-1.0-SNAPSHOT.zip
+[info]
+[success] Total time: 4 s, completed Aug 8, 2014 2:04:06 PM
+```
+
+That there zip file can be unzipperated (or whatever the technical term is for that) and run like so:
+```
+unzip capillary-1.0-SNAPSHOT.zip
+cd capillary-1.0-SNAPSHOT
+bin/capillary
+Play server process ID is 24223
+[info] play - Application started (Prod)
+[info] play - Listening for HTTP on /0:0:0:0:0:0:0:0:9000
+```
+
+Then you can hit that URL via your web browser with some args:
+
+`http://127.0.0.1:9000/api/status?toporoot=kendra-write_event-staging&topic=migration-staging`
+
+The args are toporoot (which you should know from your spout configuration) and topic because hopefully you know what you are reading from. :)
+
+# Other Notes
+
+* Includes a JAR for Foursquare's for of Twitter's Zookeeper library because it's small and awesome
+* Uses 2.10.4 because Kafka (at the time of this writing) doesn't have 2.11 artifacts and explodes
+
 # Structure
 
 Storm's Kafka spout stores it's committed state in a ZK structure like this:
