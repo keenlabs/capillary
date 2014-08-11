@@ -17,7 +17,7 @@ data = json.loads(state)
 
 amount = 0
 for looplord in data:
-    if looplord['amount'] != None:
+    if looplord['amount'] is not None:
         amount += looplord['amount']
 
 statsd.histogram(
