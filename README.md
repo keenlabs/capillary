@@ -71,7 +71,7 @@ If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper t
 
 # Other Notes
 
-* Includes a JAR for Foursquare's for of Twitter's Zookeeper library because it's small and awesome
+* Includes a JAR for Foursquare's port of Twitter's Zookeeper library because it's small and awesome
 * Uses 2.10.4 because Kafka (at the time of this writing) doesn't have 2.11 artifacts and explodes
 
 # Structure
