@@ -28,20 +28,20 @@ object ZkKafka {
     // This is here because staging has old and new partition znodes :(
     val validParts = parts.filter { p => p.startsWith("partition") }
 
-    return validParts.map { vp =>
+    return validParts.par.map({ vp =>
       val jsonState = new String(zk.get(s"$stormZkRoot$root/" + s(0) + s"/$vp"))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
       val partition = (state \ "partition").as[Long]
       val ttopic = (state \ "topic").as[String]
       (partition.toInt, offset)
-    } toMap
+    }).seq.toMap
   }
 
   def getKafkaState(topic: String): Map[Int, Long] = {
 
     val kParts = zk.getChildren(s"$kafkaZkRoot/brokers/topics/$topic/partitions")
-    kParts.map { kp =>
+    kParts.par.map({ kp =>
       val jsonState = new String(zk.get(s"$kafkaZkRoot/brokers/topics/$topic/partitions/$kp/state"))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
@@ -63,6 +63,6 @@ object ZkKafka {
         println("ERROR!")
       }
       (kp.toInt, response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0))
-    } toMap
+    }).seq.toMap
   }
 }
