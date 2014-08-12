@@ -59,7 +59,7 @@ By way of [Play](http://www.playframework.com/) Capillary uses [Typesafe Config]
 
 Most simply you can specify properties when starting the app or include `conf/application-local.conf` at runtime.
 
-There are two configuration options:
+Here are the configuration options:
 
 ### capillary.zookeepers
 
@@ -68,6 +68,12 @@ Set this to a list of your ZKs like every other ZK thingie it uses something lik
 ### capillary.kafka.zkroot
 
 If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use '/kafka8' after upgrading from 0.7.
+
+### capillary.storm.zkroot
+
+If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use '/keen-storm'.
+
+###
 
 # Other Notes
 
