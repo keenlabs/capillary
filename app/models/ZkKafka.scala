@@ -17,6 +17,22 @@ object ZkKafka {
   val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot").getOrElse("") + "/"
   lazy val zk = new ZooKeeperClient(zookeepers)
 
+  def getSpouts(): Seq[String] = {
+    // XXX Fix this and the config above
+    val thisIsDumb = stormZkRoot.substring(0, stormZkRoot.length - 1)
+    zk.getChildren(thisIsDumb)
+  }
+
+  def getSpoutTopic(root: String): String = {
+
+    val s = zk.getChildren(s"$stormZkRoot$root")
+    val parts = zk.getChildren(s"$stormZkRoot$root/" + s(0))
+    val jsonState = new String(zk.get(s"$stormZkRoot$root/" + s(0) + "/" + parts(0)))
+    val state = Json.parse(jsonState)
+    val topic = (state \ "topic").as[String]
+    return topic
+  }
+
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
 
@@ -25,10 +41,7 @@ object ZkKafka {
     // We assume that there's only one child. This might break things
     val parts = zk.getChildren(s"$stormZkRoot$root/" + s(0))
 
-    // This is here because staging has old and new partition znodes :(
-    val validParts = parts.filter { p => p.startsWith("partition") }
-
-    return validParts.par.map({ vp =>
+    return parts.par.map({ vp =>
       val jsonState = new String(zk.get(s"$stormZkRoot$root/" + s(0) + s"/$vp"))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]

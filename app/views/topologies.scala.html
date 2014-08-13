@@ -1,0 +1,25 @@
+@(topic: String, deltas: Seq[models.ZkKafka.Delta])
+
+@main("Capillary") {
+
+  <h1>Deltas for "@topic"</h1>
+  <table class="table table-striped table-bordered table-hover">
+   <thead>
+    <th>Partition</th>
+    <th>Delta</th>
+    <th>Kafka Current</th>
+    <th>Spout Current</th>
+
+   </thead>
+    <tbody>
+      @for(delta <- deltas) {
+      <tr>
+       <td>@delta.partition</td>
+       <td>@delta.amount</th>
+       <td>@delta.current</th>
+       <td>@delta.storm</th>
+      </tr>
+      }
+    </tbody>
+   </table>
+}

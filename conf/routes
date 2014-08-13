@@ -3,7 +3,8 @@
 # ~~~~
 
 # Home page
-GET     /                           controllers.Application.index(toporoot: String, topic: String)
+GET     /                           controllers.Application.index
+GET     /topo                       controllers.Application.topo(toporoot: String, topic: String)
 
 GET     /api/status                 controllers.api.Status.current(toporoot: String, topic: String)
 

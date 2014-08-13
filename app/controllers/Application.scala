@@ -7,8 +7,14 @@ import play.api.mvc._
 
 object Application extends Controller {
 
-  def index(topoRoot: String, topic: String) = Action {
+  def index = Action {
 
+    val spouts = ZkKafka.getSpouts()
+
+    Ok(views.html.index(spouts))
+  }
+
+  def topo(topoRoot: String, topic: String) = Action {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
     val zkState = ZkKafka.getKafkaState(topic)
@@ -23,7 +29,7 @@ object Application extends Controller {
       )
     }
 
-    Ok(views.html.index(topic, deltas.toSeq))
+    Ok(views.html.topologies(topic, deltas.toSeq))
   }
 
 }
