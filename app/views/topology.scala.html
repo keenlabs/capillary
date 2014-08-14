@@ -1,4 +1,4 @@
-@(name: String, topic: String, deltas: Seq[models.ZkKafka.Delta])(implicit request: play.api.mvc.RequestHeader)
+@(name: String, topic: String, total: Long, deltas: Seq[models.ZkKafka.Delta])(implicit request: play.api.mvc.RequestHeader)
 
 @main("Capillary") {
 
@@ -9,9 +9,14 @@
     <th>Delta (Messages)</th>
     <th>Kafka Current</th>
     <th>Spout Current</th>
-
    </thead>
     <tbody>
+      <tr class="info">
+       <td>All</td>
+       <td>Total: @total</th>
+       <td>&nbsp;</th>
+       <td>&nbsp;</th>
+      </tr>
       @for(delta <- deltas) {
       <tr>
        <td>@delta.partition</td>
@@ -21,5 +26,13 @@
       </tr>
       }
     </tbody>
+    <tfoot>
+      <tr class="info">
+       <td>All</td>
+       <td>Total: @total</th>
+       <td>&nbsp;</th>
+       <td>&nbsp;</th>
+      </tr>
+    </tfoot>
    </table>
 }

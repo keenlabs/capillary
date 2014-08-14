@@ -19,17 +19,20 @@ object Application extends Controller {
 
     val zkState = ZkKafka.getKafkaState(topic)
 
+    var total = 0L;
     val deltas = zkState.map({ partAndOffset =>
       val partition = partAndOffset._1
       val koffset = partAndOffset._2
       stormState.get(partition) map { soffset =>
-        Delta(partition = partition, amount = Some(koffset - soffset), current = koffset, storm = Some(soffset))
+        val amount = koffset - soffset
+        total = amount + total
+        Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
       } getOrElse(
         Delta(partition = partition, amount = None, current = koffset, storm = None)
       )
     }).toList.sortBy(_.partition)
 
-    Ok(views.html.topology(name, topic, deltas.toSeq))
+    Ok(views.html.topology(name, topic, total, deltas.toSeq))
   }
 
 }
