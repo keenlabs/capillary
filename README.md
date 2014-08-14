@@ -49,9 +49,9 @@ Play server process ID is 24223
 
 Then you can hit that URL via your web browser with some args:
 
-`http://127.0.0.1:9000/api/status?toporoot=kendra-write_event-staging&topic=migration-staging`
+`http://127.0.0.1:9000`
 
-The args are `toporoot` (which you should know from your spout configuration) and `topic` because hopefully you know what you are reading from. :)
+Capillary will try and dig information out of Zookeeper to show what topologies you have running.
 
 ## Configuration
 

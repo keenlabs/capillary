@@ -1,12 +1,12 @@
-@(topic: String, deltas: Seq[models.ZkKafka.Delta])
+@(name: String, topic: String, deltas: Seq[models.ZkKafka.Delta])(implicit request: play.api.mvc.RequestHeader)
 
 @main("Capillary") {
 
-  <h1>Deltas for "@topic"</h1>
+  <h1>Deltas for topology "@name" <small> topic: @topic</small></h1>
   <table class="table table-striped table-bordered table-hover">
    <thead>
     <th>Partition</th>
-    <th>Delta</th>
+    <th>Delta (Messages)</th>
     <th>Kafka Current</th>
     <th>Spout Current</th>
 

@@ -1,11 +1,11 @@
-@(spouts: Seq[String])
+@(topos: Seq[models.ZkKafka.Topology])(implicit request: play.api.mvc.RequestHeader)
 
 @main("Capillary") {
 
   <h1>Topologies</h1>
    <ul>
-    @for(spout <- spouts) {
-     <li><a href="@routes.Application.topo(spout, ZkKafka.getSpoutTopic(spout))">@spout</a></li>
+    @for(topo <- topos) {
+     <li><a href="@routes.Application.topo(topo.name, topo.spoutRoot, topo.topic)">@topo.name</a></li>
     }
   </ul>
 }
