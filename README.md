@@ -1,12 +1,13 @@
 Capillary is a small web application that displays the state and
-deltas of Storm spouts with a Kafka >= 0.8 cluster.
+deltas of Kafka-based storm topologies with a Kafka >= 0.8. It also provides
+an API for fetching this information for monitoring purposes.
 
 # Overview
 
 ![Capillary](/shot.png?raw=true)
 
 Capillary does the following:
-* Takes a spoutroot and topic name from the URL
+* Fetches information about running topologies from Zookeeper
 * Fetches information about the topic's partitions and offsets from the Storm spout state in Zookeeper
 * Fetches information about the partition's leaders from Zookeeper
 * Fetches information from Kafka about the latest offset from the partitions leaders
@@ -17,30 +18,30 @@ You can hit `/api/status?toporoot=$TOPOROOT&topic=$TOPIC` to get a JSON output.
 
 # Name
 
-At [Keen IO](http://keen.io) we name our projects after plants. Services often use tree or large plant names and large projects may use more general names.
+At [Keen IO](http://keen.io) we name our projects after plants. Services often use tree or large plant names and large infrastructure projects may use more general names.
 
 [Capillary action](http://en.wikipedia.org/wiki/Capillary_action) moves water through a plant's [xylem](http://en.wikipedia.org/wiki/Xylem).
 Since Kafka and Storm handle the flow of data (water) through our infrastructure this seems a fitting name!
 
 # Running It
 
-Wanna run it? Awesome! This is a [Play Framework](http://www.playframework.com/) app so it works the way all other play apps do:
+Wanna run it? Awesome! This is a [Play Framework](http://www.playframework.com/) app so it works the way all other Play apps do:
 
 ```
 $ ./activator
 [capillary] $ dist
-… lots of crazy computer talk…
+… lots of crazy computer talk …
 [info] Done packaging.
 [info]
-[info] Your package is ready in /Users/gphat/src/capillary/target/universal/capillary-1.0-SNAPSHOT.zip
+[info] Your package is ready in /Users/gphat/src/capillary/target/universal/capillary-1.1.zip
 [info]
 [success] Total time: 4 s, completed Aug 8, 2014 2:04:06 PM
 ```
 
 That there zip file can be unzipperated (or whatever the technical term is for that) and run like so:
 ```
-unzip capillary-1.0-SNAPSHOT.zip
-cd capillary-1.0-SNAPSHOT
+unzip capillary-1.1.zip
+cd capillary-1.1
 bin/capillary
 Play server process ID is 24223
 [info] play - Application started (Prod)
@@ -57,7 +58,11 @@ Capillary will try and dig information out of Zookeeper to show what topologies 
 
 By way of [Play](http://www.playframework.com/) Capillary uses [Typesafe Config](https://github.com/typesafehub/config) so you have lots of options.
 
-Most simply you can specify properties when starting the app or include `conf/application-local.conf` at runtime.
+Most simply you can specify properties when starting the app or include `conf/application-local.conf` at runtime. Here's our runtime properties:
+
+```
+bin/capillary -Dcapillary.zookeepers=sj01-prod-zk-0000:2181,sj01-prod-zk-0001:2181,sj01-prod-zk-0002:2181 -Dcapillary.kafka.zkroot=kafka8 -Dcapillary.storm.zkroot=keen_storm
+```
 
 Here are the configuration options:
 
@@ -67,11 +72,11 @@ Set this to a list of your ZKs like every other ZK thingie it uses something lik
 
 ### capillary.kafka.zkroot
 
-If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use '/kafka8' after upgrading from 0.7.
+If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use 'kafka8' after upgrading from 0.7.
 
 ### capillary.storm.zkroot
 
-If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use '/keen-storm'.
+If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use 'keen-storm'.
 
 ###
 
@@ -79,6 +84,7 @@ If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper t
 
 * Includes a JAR for Foursquare's port of Twitter's Zookeeper library because it's small and awesome
 * Uses Scala 2.10.4 because Kafka (at the time of this writing) doesn't have 2.11 artifacts and explodes
+* Doesn't use watches, so updates every time you refresh the page
 
 # Structure
 
