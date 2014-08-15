@@ -63,7 +63,7 @@ object ZkKafka {
   def getKafkaState(topic: String): Map[Int, Long] = {
 
     val kParts = zk.getChildren(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-    kParts.par.map({ kp =>
+    kParts.map({ kp =>
       val jsonState = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state")))))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
@@ -86,6 +86,6 @@ object ZkKafka {
       }
       ks.close
       (kp.toInt, response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0))
-    }).seq.toMap
+    }).toMap
   }
 }
