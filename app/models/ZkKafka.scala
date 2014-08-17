@@ -84,8 +84,9 @@ object ZkKafka {
       if(response.hasError) {
         println("ERROR!")
       }
+      val offset = response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0)
       ks.close
-      (kp.toInt, response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0))
+      (kp.toInt, offset)
     }).toMap
   }
 }
