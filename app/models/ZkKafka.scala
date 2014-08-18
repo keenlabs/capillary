@@ -20,37 +20,41 @@ object ZkKafka {
   val zookeepers = Play.configuration.getString("capillary.zookeepers").getOrElse("localhost:2181")
   val kafkaZkRoot = Play.configuration.getString("capillary.kafka.zkroot")
   val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot")
-  lazy val zk = new ZooKeeperClient(zookeepers)
 
   def makePath(parts: Seq[Option[String]]): String = {
     parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) })
   }
 
   def getTopologies: Seq[Topology] = {
-    zk.getChildren(makePath(Seq(stormZkRoot))).map({ r =>
+    val zk = new ZooKeeperClient(zookeepers)
+    val tops = zk.getChildren(makePath(Seq(stormZkRoot))).map({ r =>
       getSpoutTopology(r)
     }).sortWith(topoCompFn)
+    zk.close
+    tops
   }
 
   def getSpoutTopology(root: String): Topology = {
+    val zk = new ZooKeeperClient(zookeepers)
     val s = zk.getChildren(makePath(Seq(stormZkRoot, Some(root))))
     val parts = zk.getChildren(makePath(Seq(stormZkRoot, Some(root), Some(s(0)))))
     val jsonState = new String(zk.get(makePath(Seq(stormZkRoot, Some(root), Some(s(0)), Some(parts(0))))))
     val state = Json.parse(jsonState)
     val topic = (state \ "topic").as[String]
     val name = (state \ "topology" \ "name").as[String]
+    zk.close
     Topology(name = name, topic = topic, spoutRoot = root)
   }
 
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
-
+    val zk = new ZooKeeperClient(zookeepers)
     val s = zk.getChildren(makePath(Seq(stormZkRoot, Some(root))))
 
     // We assume that there's only one child. This might break things
     val parts = zk.getChildren(makePath(Seq(stormZkRoot, Some(root), Some(s(0)))))
 
-    return parts.map({ vp =>
+    val states = parts.map({ vp =>
       val jsonState = new String(zk.get(makePath(Seq(stormZkRoot, Some(root), Some(s(0)), Some(vp)))))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
@@ -58,12 +62,14 @@ object ZkKafka {
       val ttopic = (state \ "topic").as[String]
       (partition.toInt, offset)
     }).toMap
+    zk.close
+    states
   }
 
   def getKafkaState(topic: String): Map[Int, Long] = {
-
+    val zk = new ZooKeeperClient(zookeepers)
     val kParts = zk.getChildren(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-    kParts.map({ kp =>
+    val states = kParts.map({ kp =>
       val jsonState = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state")))))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
@@ -88,5 +94,7 @@ object ZkKafka {
       ks.close
       (kp.toInt, offset)
     }).toMap
+    zk.close
+    states
   }
 }
