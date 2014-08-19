@@ -28,12 +28,6 @@ object ZkKafka {
   val zkClient = CuratorFrameworkFactory.newClient(zookeepers, retryPolicy);
   zkClient.start();
 
-  // val kafkaData = new PathChildrenCache(zkClient, makePath(Seq(kafkaZkRoot)), true)
-  // kafkaData.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE)
-
-  val stormData = new PathChildrenCache(zkClient, makePath(Seq(stormZkRoot)), true)
-  stormData.start(PathChildrenCache.StartMode.BUILD_INITIAL_CACHE)
-
   def makePath(parts: Seq[Option[String]]): String = {
     parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) })
   }
@@ -58,53 +52,51 @@ object ZkKafka {
     Topology(name = name, topic = topic, spoutRoot = root)
   }
 
-  // def getSpoutState(root: String, topic: String): Map[Int, Long] = {
-  //   // There is basically nothing for error checking in here.
-  //   val s = new String(stormData.getCurrentData(makePath(Seq(stormZkRoot, Some(root)))).getData)
+  def getSpoutState(root: String, topic: String): Map[Int, Long] = {
+    // There is basically nothing for error checking in here.
+    val s = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root))))
 
-  //   // We assume that there's only one child. This might break things
-  //   val parts = new String(stormData.getCurrentData(makePath(Seq(stormZkRoot, Some(root), Some(s)))).getData)
+    // We assume that there's only one child. This might break things
+    val parts = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)))))
 
-  //   val states = parts.map({ vp =>
-  //     val jsonState = new String(stormData.getCurrentData(makePath(Seq(stormZkRoot, Some(root), Some(s), Some(vp)))))
-  //     val state = Json.parse(jsonState)
-  //     val offset = (state \ "offset").as[Long]
-  //     val partition = (state \ "partition").as[Long]
-  //     val ttopic = (state \ "topic").as[String]
-  //     (partition.toInt, offset)
-  //   }).toMap
-  //   states
-  // }
+    val states = parts.asScala.map({ vp =>
+      val jsonState = zkClient.getData.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)), Some(vp))))
+      val state = Json.parse(jsonState)
+      val offset = (state \ "offset").as[Long]
+      val partition = (state \ "partition").as[Long]
+      val ttopic = (state \ "topic").as[String]
+      (partition.toInt, offset)
+    }).toMap
+    states
+  }
 
-  // def getKafkaState(topic: String): Map[Int, Long] = {
-  //   val zk = new ZooKeeperClient(zookeepers)
-  //   val kParts = zk.getChildren(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-  //   val states = kParts.map({ kp =>
-  //     val jsonState = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state")))))
-  //     val state = Json.parse(jsonState)
-  //     val leader = (state \ "leader").as[Long]
+  def getKafkaState(topic: String): Map[Int, Long] = {
+    val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
+    val states = kParts.asScala.map({ kp =>
+      val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
+      val state = Json.parse(jsonState)
+      val leader = (state \ "leader").as[Long]
 
-  //     val idJson = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString)))))
-  //     val leaderState = Json.parse(idJson)
-  //     val host = (leaderState \ "host").as[String]
-  //     val port = (leaderState \ "port").as[Int]
+      val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
+      val leaderState = Json.parse(idJson)
+      val host = (leaderState \ "host").as[String]
+      val port = (leaderState \ "port").as[Int]
 
-  //     val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
-  //     val topicAndPartition = TopicAndPartition(topic, kp.toInt)
-  //     val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
-  //         topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
-  //     )
-  //     val request = new OffsetRequest(
-  //       requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
-  //     val response = ks.getOffsetsBefore(request);
-  //     if(response.hasError) {
-  //       println("ERROR!")
-  //     }
-  //     val offset = response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0)
-  //     ks.close
-  //     (kp.toInt, offset)
-  //   }).toMap
-  //   zk.close
-  //   states
-  // }
+      val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
+      val topicAndPartition = TopicAndPartition(topic, kp.toInt)
+      val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
+          topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
+      )
+      val request = new OffsetRequest(
+        requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
+      val response = ks.getOffsetsBefore(request);
+      if(response.hasError) {
+        println("ERROR!")
+      }
+      val offset = response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0)
+      ks.close
+      (kp.toInt, offset)
+    }).toMap
+    states
+  }
 }

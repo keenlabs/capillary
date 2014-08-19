@@ -5,7 +5,7 @@
   <h1>Topologies</h1>
    <ul>
     @for(topo <- topos) {
-     <li><a href="#">@topo.name</a></li>
+     <li><a href="@routes.Application.topo(topo.name, topo.spoutRoot, topo.topic)">@topo.name</a></li>
     }
   </ul>
 }
