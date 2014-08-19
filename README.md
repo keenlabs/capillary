@@ -82,7 +82,6 @@ If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper t
 
 # Other Notes
 
-* Includes a JAR for Foursquare's port of Twitter's Zookeeper library because it's small and awesome
 * Uses Scala 2.10.4 because Kafka (at the time of this writing) doesn't have 2.11 artifacts and explodes
 * Doesn't use watches, so updates every time you refresh the page
 

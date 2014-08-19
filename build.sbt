@@ -18,3 +18,7 @@ libraryDependencies ++= Seq(
       exclude("com.sun.jmx", "jmxri")
       exclude("org.slf4j", "slf4j-simple")
 )
+
+libraryDependencies += "org.apache.curator" % "curator-framework" % "2.6.0"
+
+libraryDependencies += "org.apache.curator" % "curator-recipes" % "2.6.0"

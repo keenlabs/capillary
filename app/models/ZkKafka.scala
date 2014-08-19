@@ -1,12 +1,15 @@
 package models
 
-import com.twitter.zookeeper.ZooKeeperClient
 import kafka.api.{OffsetFetchRequest,OffsetRequest,PartitionOffsetRequestInfo}
 import kafka.common.TopicAndPartition
 import kafka.consumer.SimpleConsumer
+import org.apache.curator.framework.CuratorFrameworkFactory
+import org.apache.curator.framework.recipes.cache.PathChildrenCache
+import org.apache.curator.retry.ExponentialBackoffRetry
 import play.api.libs.json._
 import play.api.Play
 import play.api.Play.current
+import scala.collection.JavaConverters._
 
 object ZkKafka {
 
@@ -21,64 +24,66 @@ object ZkKafka {
   val kafkaZkRoot = Play.configuration.getString("capillary.kafka.zkroot")
   val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot")
 
+  val retryPolicy = new ExponentialBackoffRetry(1000, 3)
+  val zkClient = CuratorFrameworkFactory.newClient(zookeepers, retryPolicy);
+  zkClient.start();
+
   def makePath(parts: Seq[Option[String]]): String = {
     parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) })
   }
 
   def getTopologies: Seq[Topology] = {
-    val zk = new ZooKeeperClient(zookeepers)
-    val tops = zk.getChildren(makePath(Seq(stormZkRoot))).map({ r =>
+    zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.map({ r =>
       getSpoutTopology(r)
     }).sortWith(topoCompFn)
-    zk.close
-    tops
   }
 
   def getSpoutTopology(root: String): Topology = {
-    val zk = new ZooKeeperClient(zookeepers)
-    val s = zk.getChildren(makePath(Seq(stormZkRoot, Some(root))))
-    val parts = zk.getChildren(makePath(Seq(stormZkRoot, Some(root), Some(s(0)))))
-    val jsonState = new String(zk.get(makePath(Seq(stormZkRoot, Some(root), Some(s(0)), Some(parts(0))))))
+    // Fetch the spout root
+    val s = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root))))
+    // Fetch the partitions so we can pick the first one
+    val parts = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)))))
+    // Use the first partition's data to build up info about the topology
+    val jsonState = new String(zkClient.getData.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)), Some(parts.get(0))))))
     val state = Json.parse(jsonState)
     val topic = (state \ "topic").as[String]
     val name = (state \ "topology" \ "name").as[String]
-    zk.close
     Topology(name = name, topic = topic, spoutRoot = root)
   }
 
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
-    val zk = new ZooKeeperClient(zookeepers)
-    val s = zk.getChildren(makePath(Seq(stormZkRoot, Some(root))))
+    val s = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root))))
 
     // We assume that there's only one child. This might break things
-    val parts = zk.getChildren(makePath(Seq(stormZkRoot, Some(root), Some(s(0)))))
+    val parts = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)))))
 
-    val states = parts.map({ vp =>
-      val jsonState = new String(zk.get(makePath(Seq(stormZkRoot, Some(root), Some(s(0)), Some(vp)))))
+    // Fetch JSON data for each partition and return the partition & offset
+    parts.asScala.map({ vp =>
+      val jsonState = zkClient.getData.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)), Some(vp))))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
       val partition = (state \ "partition").as[Long]
-      val ttopic = (state \ "topic").as[String]
       (partition.toInt, offset)
     }).toMap
-    zk.close
-    states
   }
 
   def getKafkaState(topic: String): Map[Int, Long] = {
-    val zk = new ZooKeeperClient(zookeepers)
-    val kParts = zk.getChildren(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-    val states = kParts.map({ kp =>
-      val jsonState = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state")))))
+    // Fetch info for each partition, given the topic
+    val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
+    // For each partition fetch the JSON state data to find the leader for each partition
+    kParts.asScala.map({ kp =>
+      val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
 
-      val idJson = new String(zk.get(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString)))))
+      // Knowing the leader's ID, fetch info about that host so we can contact it.
+      val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
       val leaderState = Json.parse(idJson)
       val host = (leaderState \ "host").as[String]
       val port = (leaderState \ "port").as[Int]
 
+      // Talk to the lead broker and get offset data!
       val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
       val topicAndPartition = TopicAndPartition(topic, kp.toInt)
       val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
@@ -94,7 +99,5 @@ object ZkKafka {
       ks.close
       (kp.toInt, offset)
     }).toMap
-    zk.close
-    states
   }
 }
