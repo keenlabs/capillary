@@ -31,6 +31,8 @@ for looplord in data:
         )
         amount += looplord['amount']
 
+print "Got {} for {}".format(amount, topology)
+
 statsd.histogram(
     'razor.kafkamon.total_delta',
     amount, tags = [ "topology:{}".format(topology) ]
