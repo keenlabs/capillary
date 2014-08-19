@@ -20,11 +20,11 @@ data = json.loads(state)
 amount = 0
 for looplord in data:
     if looplord['amount'] is not None:
-        statsd.histogram(
+        statsd.gauge(
             'razor.kafkamon.topology.partition',
             amount,
             tags = [
-                "topic:{}".format(sys),
+                "topic:{}".format(topic),
                 "topology:{}".format(topology),
                 "partition:{}".format(looplord['partition'])
             ]
@@ -33,7 +33,10 @@ for looplord in data:
 
 print "Got {} for {}".format(amount, topology)
 
-statsd.histogram(
+statsd.gauge(
     'razor.kafkamon.total_delta',
-    amount, tags = [ "topology:{}".format(topology) ]
+    amount, tags = [
+        "topic:{}".format(topic),
+        "topology:{}".format(topology)
+    ]
 )
