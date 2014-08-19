@@ -58,28 +58,32 @@ object ZkKafka {
     // We assume that there's only one child. This might break things
     val parts = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)))))
 
+    // Fetch JSON data for each partition and return the partition & offset
     parts.asScala.map({ vp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)), Some(vp))))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
       val partition = (state \ "partition").as[Long]
-      val ttopic = (state \ "topic").as[String]
       (partition.toInt, offset)
     }).toMap
   }
 
   def getKafkaState(topic: String): Map[Int, Long] = {
+    // Fetch info for each partition, given the topic
     val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
+    // For each partition fetch the JSON state data to find the leader for each partition
     kParts.asScala.map({ kp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
 
+      // Knowing the leader's ID, fetch info about that host so we can contact it.
       val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
       val leaderState = Json.parse(idJson)
       val host = (leaderState \ "host").as[String]
       val port = (leaderState \ "port").as[Int]
 
+      // Talk to the lead broker and get offset data!
       val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
       val topicAndPartition = TopicAndPartition(topic, kp.toInt)
       val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
