@@ -4,9 +4,9 @@
 
 # Home page
 GET     /                           controllers.Application.index
-GET     /topo                       controllers.Application.topo(name: String, toporoot: String, topic: String)
+#GET     /topo                       controllers.Application.topo(name: String, toporoot: String, topic: String)
 
-GET     /api/status                 controllers.api.Status.current(toporoot: String, topic: String)
+#GET     /api/status                 controllers.api.Status.current(toporoot: String, topic: String)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
