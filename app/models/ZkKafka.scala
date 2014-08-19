@@ -33,10 +33,9 @@ object ZkKafka {
   }
 
   def getTopologies: Seq[Topology] = {
-    val tops = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.map({ r =>
+    zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.map({ r =>
       getSpoutTopology(r)
     }).sortWith(topoCompFn)
-    tops
   }
 
   def getSpoutTopology(root: String): Topology = {
@@ -59,7 +58,7 @@ object ZkKafka {
     // We assume that there's only one child. This might break things
     val parts = zkClient.getChildren.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)))))
 
-    val states = parts.asScala.map({ vp =>
+    parts.asScala.map({ vp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(stormZkRoot, Some(root), Some(s.get(0)), Some(vp))))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
@@ -67,12 +66,11 @@ object ZkKafka {
       val ttopic = (state \ "topic").as[String]
       (partition.toInt, offset)
     }).toMap
-    states
   }
 
   def getKafkaState(topic: String): Map[Int, Long] = {
     val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-    val states = kParts.asScala.map({ kp =>
+    kParts.asScala.map({ kp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
       val state = Json.parse(jsonState)
       val leader = (state \ "leader").as[Long]
@@ -97,6 +95,5 @@ object ZkKafka {
       ks.close
       (kp.toInt, offset)
     }).toMap
-    states
   }
 }
