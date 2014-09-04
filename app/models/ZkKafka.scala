@@ -100,4 +100,25 @@ object ZkKafka {
       (kp.toInt, offset)
     }).toMap
   }
+
+  def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Long, List[Delta]] = {
+    val stormState = ZkKafka.getSpoutState(topoRoot, topic)
+
+    val zkState = ZkKafka.getKafkaState(topic)
+
+    var total = 0L;
+    val deltas = zkState.map({ partAndOffset =>
+      val partition = partAndOffset._1
+      val koffset = partAndOffset._2
+      stormState.get(partition) map { soffset =>
+        val amount = koffset - soffset
+        total = amount + total
+        Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
+      } getOrElse(
+        Delta(partition = partition, amount = None, current = koffset, storm = None)
+      )
+    }).toList.sortBy(_.partition)
+
+    (total, deltas)
+  }
 }
