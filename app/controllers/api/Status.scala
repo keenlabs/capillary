@@ -5,7 +5,7 @@ import models.ZkKafka._
 import play.api._
 import play.api.libs.json._
 import play.api.mvc._
-import _root_.util.JsonFormats._
+import _root_.utils.JsonFormats._
 
 object Status extends Controller {
 
