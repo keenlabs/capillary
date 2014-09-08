@@ -16,9 +16,8 @@ libraryDependencies ++= Seq(
       exclude("org.slf4j", "slf4j-simple"),
   "nl.grons" %% "metrics-scala" % "3.0.4",
   "com.codahale.metrics" % "metrics-json" % "3.0.1",
-  "com.codahale.metrics" % "metrics-jvm" % "3.0.1"
+  "com.codahale.metrics" % "metrics-jvm" % "3.0.1",
+  "org.apache.curator" % "curator-framework" % "2.6.0",
+  "org.apache.curator" % "curator-recipes" % "2.6.0",
+  "org.coursera" % "metrics-datadog" % "0.1.7"
 )
-
-libraryDependencies += "org.apache.curator" % "curator-framework" % "2.6.0"
-
-libraryDependencies += "org.apache.curator" % "curator-recipes" % "2.6.0"

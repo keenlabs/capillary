@@ -3,6 +3,7 @@ package controllers
 import com.codahale.metrics.json.MetricsModule
 import com.codahale.metrics.{MetricRegistry, SharedMetricRegistries}
 import com.fasterxml.jackson.databind.{ObjectWriter, ObjectMapper}
+import com.yammer.metrics.reporting.DatadogReporter
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
 import models.Metrics
@@ -18,13 +19,23 @@ object Application extends Controller {
   val validUnits = Some(Set("NANOSECONDS", "MICROSECONDS", "MILLISECONDS", "SECONDS", "MINUTES", "HOURS", "DAYS"))
   val mapper = new ObjectMapper()
 
-  def registryName = Play.configuration.getString("metrics.name").getOrElse("default")
-  def rateUnit     = Play.configuration.getString("metrics.rateUnit", validUnits).getOrElse("SECONDS")
-  def durationUnit = Play.configuration.getString("metrics.durationUnit", validUnits).getOrElse("SECONDS")
-  def showSamples  = Play.configuration.getBoolean("metrics.showSamples").getOrElse(false)
+  def registryName = Play.configuration.getString("capillary.metrics.name").getOrElse("default")
+  def rateUnit     = Play.configuration.getString("capillary.metrics.rateUnit", validUnits).getOrElse("SECONDS")
+  def durationUnit = Play.configuration.getString("capillary.metrics.durationUnit", validUnits).getOrElse("SECONDS")
+  def showSamples  = Play.configuration.getBoolean("capillary.metrics.showSamples").getOrElse(false)
+  def ddAPIKey     = Play.configuration.getString("capillary.metrics.datadog.apiKey")
 
   val module = new MetricsModule(rateUnit, durationUnit, showSamples)
   mapper.registerModule(module)
+
+  ddAPIKey.map({ apiKey =>
+    Logger.info("Starting Datadog Reporter")
+    val reporter = new DatadogReporter.Builder()
+      .withApiKey(apiKey)
+      // .withMetricNameFormatter(ShortenedNameFormatter)
+      .build()
+    reporter.start(20, TimeUnit.SECONDS)
+  })
 
   implicit def stringToTimeUnit(s: String) : TimeUnit = TimeUnit.valueOf(s)
 
