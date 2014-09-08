@@ -5,13 +5,14 @@ from statsd import statsd
 
 statsd.connect('localhost', 8125)
 
-topology = sys.argv[1]
-toporoot = sys.argv[2]
-topic = sys.argv[3]
+host = sys.argv[1]
+topology = sys.argv[2]
+toporoot = sys.argv[3]
+topic = sys.argv[4]
 
 state = urllib2.urlopen(
-    "http://localhost:9000/api/status?toporoot={}&topic={}".format(
-        toporoot, topic
+    "http://{}/api/status?toporoot={}&topic={}".format(
+        host, toporoot, topic
     )
 ).read()
 
