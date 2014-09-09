@@ -23,7 +23,7 @@ for looplord in data:
     if looplord['amount'] is not None:
         statsd.gauge(
             'razor.kafkamon.topology.partition',
-            amount,
+            looplord['amount'],
             tags = [
                 "topic:{}".format(topic),
                 "topology:{}".format(topology),
