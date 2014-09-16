@@ -78,6 +78,10 @@ If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper t
 
 If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use 'keen-storm'.
 
+### capillary.use.trident
+
+Set this to true if you would like to monitor trident topologies instead of pure storm. This will modify the Zookeeper paths used to match Trident's convention.
+
 ###
 
 # Other Notes
