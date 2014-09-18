@@ -34,7 +34,7 @@ object ZkKafka {
   }
 
   def applyBase(path: Seq[Option[String]]): Seq[Option[String]] = {
-    if(isTrident.equals(true)) path ++ Seq(Some("user")) else path
+    if(isTrident.equals("true")) path ++ Seq(Some("user")) else path
   }
 
   def getTopologies: Seq[Topology] = {
@@ -49,7 +49,7 @@ object ZkKafka {
     // Fetch the partitions so we can pick the first one
     val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0)))))
     // Use the first partition's data to build up info about the topology
-    val jsonState = new String(zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0)), Some(parts.get(0))))))
+    val jsonState = new String(zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0))) ++ Seq(Some(parts.get(0))))))
     val state = Json.parse(jsonState)
     val topic = (state \ "topic").as[String]
     val name = (state \ "topology" \ "name").as[String]
