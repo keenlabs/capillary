@@ -59,13 +59,9 @@ object ZkKafka {
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
     val s = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))
-
-    // We assume that there's only one child. This might break things
-    val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0)))))
-
-    // Fetch JSON data for each partition and return the partition & offset
-    parts.asScala.map({ vp =>
-      val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0)), Some(vp))))
+    s.asScala.map({ pts =>
+      val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
+      val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(parts.get(0)))))
       val state = Json.parse(jsonState)
       val offset = (state \ "offset").as[Long]
       val partition = (state \ "partition").as[Long]
@@ -92,7 +88,7 @@ object ZkKafka {
       val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
       val topicAndPartition = TopicAndPartition(topic, kp.toInt)
       val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
-          topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
+        topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
       )
       val request = new OffsetRequest(
         requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
@@ -121,7 +117,7 @@ object ZkKafka {
         Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
       } getOrElse(
         Delta(partition = partition, amount = None, current = koffset, storm = None)
-      )
+        )
     }).toList.sortBy(_.partition)
 
     (total, deltas)
