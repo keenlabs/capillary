@@ -1,4 +1,4 @@
-package util
+package utils
 
 import models.ZkKafka
 import models.ZkKafka._

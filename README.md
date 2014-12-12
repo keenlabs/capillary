@@ -28,20 +28,16 @@ Since Kafka and Storm handle the flow of data (water) through our infrastructure
 Wanna run it? Awesome! This is a [Play Framework](http://www.playframework.com/) app so it works the way all other Play apps do:
 
 ```
-$ ./activator
-[capillary] $ dist
+$ sbt universal:package-zip-tarball
 … lots of crazy computer talk …
-[info] Done packaging.
-[info]
-[info] Your package is ready in /Users/gphat/src/capillary/target/universal/capillary-1.1.zip
-[info]
 [success] Total time: 4 s, completed Aug 8, 2014 2:04:06 PM
 ```
+You should find a tarball at `target/universal/capillary-VERSION.tgz`.
 
-That there zip file can be unzipperated (or whatever the technical term is for that) and run like so:
+That there tgz file can be untarballerated (or whatever the technical term is for that) and run like so:
 ```
-unzip capillary-1.1.zip
-cd capillary-1.1
+tar xzf capillary-1.2.tgz
+cd capillary-1.2
 bin/capillary
 Play server process ID is 24223
 [info] play - Application started (Prod)
@@ -77,6 +73,10 @@ If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper t
 ### capillary.storm.zkroot
 
 If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use 'keen-storm'.
+
+### capillary.use.trident
+
+Set this to true if you would like to monitor trident topologies instead of pure storm. This will modify the Zookeeper paths used to match Trident's convention.
 
 ###
 
