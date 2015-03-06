@@ -7,6 +7,7 @@ import org.apache.curator.framework.CuratorFrameworkFactory
 import org.apache.curator.framework.recipes.cache.PathChildrenCache
 import org.apache.curator.retry.ExponentialBackoffRetry
 import play.api.libs.json._
+import play.api.Logger
 import play.api.Play
 import play.api.Play.current
 import scala.collection.JavaConverters._
@@ -43,7 +44,16 @@ object ZkKafka {
     }).flatten.sortWith(topoCompFn)
   }
 
-  def getZkData(path: String): Option[Array[Byte]] = Option(zkClient.getData.forPath(path))
+  def getZkData(path: String): Option[Array[Byte]] = {
+    val maybeData = Option(zkClient.getData.forPath(path))
+    maybeData match {
+      case Some(data) => maybeData
+      case None => {
+        Logger.error("Zookeeper Path " + path + " returned (null)!")
+        maybeData
+      }
+    }
+  }
 
   def getSpoutTopology(root: String): Option[Topology] = {
     // Fetch the spout root
