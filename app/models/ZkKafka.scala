@@ -46,13 +46,10 @@ object ZkKafka {
 
   def getZkData(path: String): Option[Array[Byte]] = {
     val maybeData = Option(zkClient.getData.forPath(path))
-    maybeData match {
-      case Some(data) => maybeData
-      case None => {
-        Logger.error("Zookeeper Path " + path + " returned (null)!")
-        maybeData
-      }
+    if ( maybeData.isEmpty ) {
+      Logger.error("Zookeeper Path " + path + " returned (null)!")
     }
+    maybeData
   }
 
   def getSpoutTopology(root: String): Option[Topology] = {
