@@ -7,6 +7,7 @@ import org.apache.curator.framework.CuratorFrameworkFactory
 import org.apache.curator.framework.recipes.cache.PathChildrenCache
 import org.apache.curator.retry.ExponentialBackoffRetry
 import play.api.libs.json._
+import play.api.Logger
 import play.api.Play
 import play.api.Play.current
 import scala.collection.JavaConverters._
@@ -40,20 +41,34 @@ object ZkKafka {
   def getTopologies: Seq[Topology] = {
     zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.map({ r =>
       getSpoutTopology(r)
-    }).sortWith(topoCompFn)
+    }).flatten.sortWith(topoCompFn)
   }
 
-  def getSpoutTopology(root: String): Topology = {
+  def getZkData(path: String): Option[Array[Byte]] = {
+    val maybeData = Option(zkClient.getData.forPath(path))
+    if ( maybeData.isEmpty ) {
+      Logger.error("Zookeeper Path " + path + " returned (null)!")
+    }
+    maybeData
+  }
+
+  def getSpoutTopology(root: String): Option[Topology] = {
     // Fetch the spout root
-    val s = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))
-    // Fetch the partitions so we can pick the first one
-    val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0)))))
-    // Use the first partition's data to build up info about the topology
-    val jsonState = new String(zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(s.get(0))) ++ Seq(Some(parts.get(0))))))
-    val state = Json.parse(jsonState)
-    val topic = (state \ "topic").as[String]
-    val name = (state \ "topology" \ "name").as[String]
-    Topology(name = name, topic = topic, spoutRoot = root)
+    zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))))).asScala.flatMap({ spout =>
+      zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)))).asScala.flatMap({ part =>
+        // Fetch the partitions so we can pick the first one
+        val path = makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)) ++ Seq(Some(part)))
+        // Use the first partition's data to build up info about the topology
+        // Also, don't trust zk to have valid JSON, it may be null or something...
+        getZkData(path).map { zkData =>
+          val jsonState = new String(zkData)
+          val state = Json.parse(jsonState)
+          val topic = (state \ "topic").as[String]
+          val name  = (state \ "topology" \ "name").as[String]
+          Topology(name = name, topic = topic, spoutRoot = root)
+        }
+      })
+    }).headOption
   }
 
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
