@@ -2,10 +2,15 @@
 
 @main("Capillary") {
 
+
   <h1>Topologies</h1>
-   <ul>
+  <div id="container"></div>
+  <script src="@routes.Assets.at("javascripts/bundle.js")"></script>
+  <script>
+    var topologies = [];
     @for(topo <- topos) {
-     <li><a href="@routes.Application.topo(topo.name, topo.spoutRoot, topo.topic)">@topo.name</a></li>
+      topologies.push({ name: "@topo.name", root: "@topo.spoutRoot", topic: "@topo.topic" });
     }
-  </ul>
+    window.renderOverview(topologies, document.getElementById('container'));
+  </script>
 }
