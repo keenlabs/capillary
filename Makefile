@@ -3,7 +3,12 @@
 
 GITHUB_URL=https://github.com/keenlabs/capillary
 
+.PHONY: javascript
+
 default: compile
+
+javascript:
+	browserify --standalone overview -t reactify app/assets/javascripts/overview.js -o app/assets/javascripts/bundle.js
 
 compile:
 	sbt compile
