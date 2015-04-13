@@ -74,13 +74,18 @@ object ZkKafka {
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
     val s = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))
-    s.asScala.map({ pts =>
+    // This gets us to the spout root
+    s.asScala.flatMap({ pts =>
+      // Fetch the partition information
       val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
-      val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(parts.get(0)))))
-      val state = Json.parse(jsonState)
-      val offset = (state \ "offset").as[Long]
-      val partition = (state \ "partition").as[Long]
-      (partition.toInt, offset)
+      // For each partition, fetch the offsets.
+      parts.asScala.map({ p =>
+        val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
+        val state = Json.parse(jsonState)
+        val offset = (state \ "offset").as[Long]
+        val partition = (state \ "partition").as[Long]
+        (partition.toInt, offset)
+      })
     }).toMap
   }
 
@@ -121,18 +126,19 @@ object ZkKafka {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
     val zkState = ZkKafka.getKafkaState(topic)
-
     var total = 0L;
     val deltas = zkState.map({ partAndOffset =>
       val partition = partAndOffset._1
       val koffset = partAndOffset._2
-      stormState.get(partition) map { soffset =>
+      // Try and pair up the partition information we got from ZK with the storm information
+      // we got from the Storm state.
+      stormState.get(partition).map({ soffset =>
         val amount = koffset - soffset
         total = amount + total
         Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
-      } getOrElse(
+      }).getOrElse(
         Delta(partition = partition, amount = None, current = koffset, storm = None)
-        )
+      )
     }).toList.sortBy(_.partition)
 
     (total, deltas)
