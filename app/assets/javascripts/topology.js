@@ -7,11 +7,9 @@ var Topology = React.createClass({
     return { delta: this.DEFAULT_DELTA };
   },
   processDeltas: function(deltas) {
-    console.log('parse deltas', deltas);
     var healthyPartitions = 0,
         unhealthyPartitions = 0,
         totalDelta = 0;
-
 
     deltas.forEach(function(delta) {
       var storm = delta.storm;
@@ -19,14 +17,15 @@ var Topology = React.createClass({
         unhealthyPartitions++;
         storm = 0;
       } else {
-        unhealthyPartitions++;
+        healthyPartitions++;
       }
-      totalDelta = delta.current - storm;
+      var partitionDelta = delta.current - storm;
+      totalDelta += partitionDelta
     });
+
     this.setState({ delta: totalDelta, healthy: healthyPartitions, unhealthy: unhealthyPartitions, error: false, message: '' });
   },
   refreshDelta: function() {
-    console.log('refreshing delta');
     var r = new XMLHttpRequest();
     var query = "topic=" + this.props.topic + "&toporoot=" + this.props.root;
     r.open("GET", "/api/status?" + query, true);
@@ -69,7 +68,7 @@ var Topology = React.createClass({
       <tr className={classes.join(' ')}>
         <td><a href={url}>{ this.props.name }</a></td>
         <td>{ this.state.delta }</td>
-        <td>{ this.state.topic }</td>
+        <td>{ this.props.topic }</td>
         <td>{ this.state.message }</td>
       </tr>
     );

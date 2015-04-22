@@ -15,10 +15,10 @@ object Status extends Controller {
 
     val zkState = ZkKafka.getKafkaState(topic)
 
-    val totalAndDeltas = ZkKafka.getTopologyDeltas(topoRoot, topic)
+    val totalsAndDeltas = ZkKafka.getTopologyDeltas(topoRoot, topic)
 
     Ok(Json.toJson(
-      totalAndDeltas._2.toSeq
+      totalsAndDeltas._2.toSeq
     ))
   }
 }
