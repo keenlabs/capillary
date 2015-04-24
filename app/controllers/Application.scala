@@ -14,6 +14,9 @@ import play.api._
 import play.api.mvc._
 import scala.language.implicitConversions
 
+import org.joda.time.DateTime
+import org.joda.time.format.DateTimeFormat
+
 object Application extends Controller {
 
   val validUnits = Some(Set("NANOSECONDS", "MICROSECONDS", "MILLISECONDS", "SECONDS", "MINUTES", "HOURS", "DAYS"))
@@ -48,9 +51,10 @@ object Application extends Controller {
 
   def topo(name: String, topoRoot: String, topic: String) = Action { implicit request =>
 
-    val totalAndDeltas = ZkKafka.getTopologyDeltas(topoRoot, topic)
-
-    Ok(views.html.topology(name, topic, totalAndDeltas._1, totalAndDeltas._2.toSeq))
+    val totalsAndDeltas = ZkKafka.getTopologyDeltas(topoRoot, topic)
+    val dateFormat  = DateTimeFormat.fullDateTime()
+    val generatedAt = new DateTime().toString(dateFormat)
+    Ok(views.html.topology(name, topic, totalsAndDeltas._1, totalsAndDeltas._2.toSeq, generatedAt))
   }
 
   def metrics = Action {

@@ -13,7 +13,7 @@ import play.api.Play.current
 import scala.collection.JavaConverters._
 
 object ZkKafka {
-
+  case class Totals(total: Long, kafkaTotal: Long, spoutTotal: Long)
   case class Delta(partition: Int, amount: Option[Long], current: Long, storm: Option[Long])
   case class Topology(name: String, spoutRoot: String, topic: String)
 
@@ -122,11 +122,13 @@ object ZkKafka {
     }).toMap
   }
 
-  def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Long, List[Delta]] = {
+  def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Totals, List[Delta]] = {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
     val zkState = ZkKafka.getKafkaState(topic)
     var total = 0L;
+    var kafkaTotal = 0L;
+    var spoutTotal = 0L;
     val deltas = zkState.map({ partAndOffset =>
       val partition = partAndOffset._1
       val koffset = partAndOffset._2
@@ -135,12 +137,15 @@ object ZkKafka {
       stormState.get(partition).map({ soffset =>
         val amount = koffset - soffset
         total = amount + total
+        kafkaTotal = koffset + kafkaTotal
+        spoutTotal = soffset + spoutTotal
         Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
-      }).getOrElse(
+      }).getOrElse({
+        Logger.error(s"Storm State unavailable for partition ${partition}")
         Delta(partition = partition, amount = None, current = koffset, storm = None)
-      )
+      })
     }).toList.sortBy(_.partition)
 
-    (total, deltas)
+    (new Totals(total, kafkaTotal, spoutTotal), deltas)
   }
 }
