@@ -1,18 +1,22 @@
-logs
+#Build
 project/project
 project/target
 target
-tmp
-.history
 dist
-#IDE Stuff
+
+#IDE/Editor Stuff
 .idea
 *.iml
-*.swp
 out/
 .idea_modules
 .classpath
 .project
 RUNNING_PID
 .settings
+*.swp
+
+#Misc
+logs
+tmp
+.history
 conf/application-local.conf
