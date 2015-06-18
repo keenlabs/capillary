@@ -3,4 +3,4 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 // The Play plugin
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.3.4")
 
-// web plugins
+addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.6.0")
