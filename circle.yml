@@ -1,0 +1,16 @@
+machine:
+  java:
+    version: oraclejdk7
+test:
+  override:
+    - sbt scalastyle
+    - sbt test
+  post:
+    - sbt universal:package-zip-tarball
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+    - cp target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
+general:
+  artifacts:
+    - "target/universal/*.tgz"
+    - "target/specs2-reports"
+    - "target/test-reports"
