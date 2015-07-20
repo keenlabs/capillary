@@ -21,3 +21,5 @@ libraryDependencies ++= Seq(
   "org.apache.curator" % "curator-recipes" % "2.6.0",
   "org.coursera" % "metrics-datadog" % "0.1.7"
 )
+
+mappings in Universal += file("stats-to-datadog.pl") -> "stats-to-datadog.pl"
