@@ -51,8 +51,7 @@ for topo, root, topic in reports:
   print "querying stats for topo:{} root:{} topic:{}".format(topo, root, topic)
   try:
     report_stats(host, topo, root, topic)
-    except Exception as e:
-      print "Failed to report metrics for {}/{}/{} because: {}".format(topo, root, topic, str(e))
+  except Exception as e:
+    print "Failed to report metrics for {}/{}/{} because: {}".format(topo, root, topic, str(e))
 
 sys.stdout.flush()
-
