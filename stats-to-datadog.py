@@ -47,13 +47,12 @@ print "pulling stats from capillary at: {}".format(host)
 reports = json.loads(open(sys.argv[2]).read)
 print "Reporting on {}".format(json.dumps(reports, indent=4))
 
-while True:
-    for topo, root, topic in reports:
-        print "querying stats for topo:{} root:{} topic:{}".format(topo, root, topic)
-        try:
-            report_stats(host, topo, root, topic)
-        except Exception as e:
-            print "Failed to report metrics for {}/{}/{} because: {}".format(topo, root, topic, str(e))
+for topo, root, topic in reports:
+  print "querying stats for topo:{} root:{} topic:{}".format(topo, root, topic)
+  try:
+    report_stats(host, topo, root, topic)
+    except Exception as e:
+      print "Failed to report metrics for {}/{}/{} because: {}".format(topo, root, topic, str(e))
 
-    sys.stdout.flush()
-    time.sleep(30)
+sys.stdout.flush()
+
