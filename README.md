@@ -108,3 +108,4 @@ Each `$PARTITION_ID` stores state as a JSON object that looks like:
   "topic": "$TOPIC_NAME"
 }
 ```
+
