@@ -22,4 +22,4 @@ libraryDependencies ++= Seq(
   "org.coursera" % "metrics-datadog" % "0.1.7"
 )
 
-mappings in Universal += file("stats-to-datadog.pl") -> "stats-to-datadog.pl"
+mappings in Universal += file("stats-to-datadog.py") -> "stats-to-datadog.py"
