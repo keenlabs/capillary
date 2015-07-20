@@ -44,7 +44,7 @@ def report_stats(host, topology, toporoot, topic):
 host = sys.argv[1]
 print "pulling stats from capillary at: {}".format(host)
 
-reports = json.loads(open(sys.argv[2]).read)
+reports = json.loads(open(sys.argv[2]).read())
 print "Reporting on {}".format(json.dumps(reports, indent=4))
 
 for topo, root, topic in reports:
