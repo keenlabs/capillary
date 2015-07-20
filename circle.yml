@@ -1,16 +1,20 @@
 machine:
   java:
-    version: oraclejdk7
+    version: oraclejdk8
+dependencies:
+  pre:
+    - wget -q https://dl.bintray.com/sbt/debian/sbt-0.13.7.deb
+    - sudo dpkg -i sbt-0.13.7.deb
+    - wget -q http://downloads.typesafe.com/scala/2.11.7/scala-2.11.7.deb
+    - sudo dpkg -i scala-2.11.7.deb
+  cache_directories:
+    - ~/.ivy2
+    - ~/.sbt
+    - ~/.m2
+    - ~/pine/target/resolution-cache
 test:
   override:
-    - sbt scalastyle
-    - sbt test
+    - ls
   post:
     - sbt universal:package-zip-tarball
-    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
-    - cp target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
-general:
-  artifacts:
-    - "target/universal/*.tgz"
-    - "target/specs2-reports"
-    - "target/test-reports"
+    - cp target/universal/*.tgz $CIRCLE_ARTIFACTS
