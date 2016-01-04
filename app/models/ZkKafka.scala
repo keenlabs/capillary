@@ -60,9 +60,10 @@ object ZkKafka {
         val path = makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)) ++ Seq(Some(part)))
         // Use the first partition's data to build up info about the topology
         // Also, don't trust zk to have valid JSON, it may be null or something...
-        getZkData(path).map { zkData =>
-          val jsonState = new String(zkData)
-          val state = Json.parse(jsonState)
+        for {
+          zkData <- getZkData(path)
+          state <- tryParse(zkData)
+        } yield {
           val topic = (state \ "topic").as[String]
           val name  = (state \ "topology" \ "name").as[String]
           Topology(name = name, topic = topic, spoutRoot = root)
@@ -79,13 +80,15 @@ object ZkKafka {
       // Fetch the partition information
       val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
       // For each partition, fetch the offsets.
-      parts.asScala.map({ p =>
+      val seq: Seq[Option[(Int, Long)]] = parts.asScala.map({ p =>
         val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
-        val state = Json.parse(jsonState)
-        val offset = (state \ "offset").as[Long]
-        val partition = (state \ "partition").as[Long]
-        (partition.toInt, offset)
+        tryParse(jsonState).map { state =>
+          val offset = (state \ "offset").as[Long]
+          val partition = (state \ "partition").as[Long]
+          Some(partition.toInt -> offset)
+        }.getOrElse(None)
       })
+      seq.filter(_.isDefined).map(_.get)
     }).toMap
   }
 
@@ -95,31 +98,37 @@ object ZkKafka {
     // For each partition fetch the JSON state data to find the leader for each partition
     kParts.asScala.map({ kp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
-      val state = Json.parse(jsonState)
-      val leader = (state \ "leader").as[Long]
+      tryParse(jsonState).flatMap { state =>
+        val leader = (state \ "leader").as[Long]
 
-      // Knowing the leader's ID, fetch info about that host so we can contact it.
-      val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
-      val leaderState = Json.parse(idJson)
-      val host = (leaderState \ "host").as[String]
-      val port = (leaderState \ "port").as[Int]
+        // Knowing the leader's ID, fetch info about that host so we can contact it.
+        val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
+        tryParse(idJson).map { leaderState =>
+          val host = (leaderState \ "host").as[String]
+          val port = (leaderState \ "port").as[Int]
 
-      // Talk to the lead broker and get offset data!
-      val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
-      val topicAndPartition = TopicAndPartition(topic, kp.toInt)
-      val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
-        topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
-      )
-      val request = new OffsetRequest(
-        requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
-      val response = ks.getOffsetsBefore(request);
-      if(response.hasError) {
-        println("ERROR!")
-      }
-      val offset = response.partitionErrorAndOffsets.get(topicAndPartition).get.offsets(0)
-      ks.close
-      (kp.toInt, offset)
-    }).toMap
+          // Talk to the lead broker and get offset data!
+          val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
+          val topicAndPartition = TopicAndPartition(topic, kp.toInt)
+          val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
+            topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
+          )
+          val request = new OffsetRequest(
+            requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
+          val response = ks.getOffsetsBefore(request);
+
+          // in case of error, lets log some info and cease processing this partition rather than failing in the following map lookup
+          if (response.hasError) {
+            Logger.error("failed retrieving offsets for topic $topic and partition $kp, response was $response");
+            None
+          } else {
+            val offset = response.partitionErrorAndOffsets(topicAndPartition).offsets(0)
+            ks.close
+            Some(kp.toInt -> offset)
+          }
+        }
+      }.getOrElse(None)
+    }).filter(_.isDefined).map(_.get).toMap
   }
 
   def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Totals, List[Delta]] = {
@@ -147,5 +156,15 @@ object ZkKafka {
     }).toList.sortBy(_.partition)
 
     (new Totals(total, kafkaTotal, spoutTotal), deltas)
+  }
+
+  // Attempt to parse a byte array as json, and catch and log tany error rather than
+  // bubbling it up.
+  def tryParse (json: Array[Byte]): Option[JsValue] = try {
+    Some(Json.parse(json))
+  } catch {
+    case e: Exception =>
+      Logger.error(s"failed parsing json document:\n${json.take(100)}", e)
+      None
   }
 }
