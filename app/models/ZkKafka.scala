@@ -87,7 +87,9 @@ object ZkKafka {
           val partition = (state \ "partition").as[Long]
           Some(partition.toInt -> offset)
         }.getOrElse(None)
-      }).filter(_.isDefined).map(_.get)
+
+      // collapse down the valid results into the return value
+      }).flatten
     }).toMap
   }
 
@@ -127,7 +129,9 @@ object ZkKafka {
           }
         }
       }.getOrElse(None)
-    }).filter(_.isDefined).map(_.get).toMap
+
+    // collapse down the valid results into the return value
+    }).flatten.toMap
   }
 
   def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Totals, List[Delta]] = {
