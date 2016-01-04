@@ -80,15 +80,14 @@ object ZkKafka {
       // Fetch the partition information
       val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
       // For each partition, fetch the offsets.
-      val seq: Seq[Option[(Int, Long)]] = parts.asScala.map({ p =>
+      parts.asScala.map({ p =>
         val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
         tryParse(jsonState).map { state =>
           val offset = (state \ "offset").as[Long]
           val partition = (state \ "partition").as[Long]
           Some(partition.toInt -> offset)
         }.getOrElse(None)
-      })
-      seq.filter(_.isDefined).map(_.get)
+      }).filter(_.isDefined).map(_.get)
     }).toMap
   }
 
