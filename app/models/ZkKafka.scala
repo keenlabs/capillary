@@ -163,7 +163,7 @@ object ZkKafka {
 
   // Attempt to parse a byte array as json, and catch and log any error rather than
   // bubbling it up.
-  def tryParse (json: Array[Byte]): Option[JsValue] = try {
+  def tryParse(json: Array[Byte]): Option[JsValue] = try {
     Some(Json.parse(json))
   } catch {
     case e: Exception =>
