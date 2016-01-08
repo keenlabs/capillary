@@ -161,7 +161,7 @@ object ZkKafka {
     (new Totals(total, kafkaTotal, spoutTotal), deltas)
   }
 
-  // Attempt to parse a byte array as json, and catch and log tany error rather than
+  // Attempt to parse a byte array as json, and catch and log any error rather than
   // bubbling it up.
   def tryParse (json: Array[Byte]): Option[JsValue] = try {
     Some(Json.parse(json))
