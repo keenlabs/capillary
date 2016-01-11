@@ -17,7 +17,7 @@ object ZkKafka {
   case class Delta(partition: Int, amount: Option[Long], current: Long, storm: Option[Long])
   case class Topology(name: String, spoutRoot: String, topic: String)
 
-  def topoCompFn(t1: Topology, t2: Topology) = {
+  def topoCompFn(t1: Topology, t2: Topology): Boolean = {
     (t1.name compareToIgnoreCase t2.name) < 0
   }
 
@@ -46,6 +46,10 @@ object ZkKafka {
 
   def getZkData(path: String): Option[Array[Byte]] = {
     val maybeData = Option(zkClient.getData.forPath(path))
+
+    // log a message if we get a null result for a path read
+    maybeData.filter(_ == null).foreach(_ => Logger.warn(s"null data retrieved for path $path"))
+
     if ( maybeData.isEmpty ) {
       Logger.error("Zookeeper Path " + path + " returned (null)!")
     }
@@ -85,8 +89,8 @@ object ZkKafka {
         tryParse(jsonState).map { state =>
           val offset = (state \ "offset").as[Long]
           val partition = (state \ "partition").as[Long]
-          Some(partition.toInt -> offset)
-        }.getOrElse(None)
+          (partition.toInt -> offset)
+        }
 
       // collapse down the valid results into the return value
       }).flatten
@@ -167,7 +171,7 @@ object ZkKafka {
     Some(Json.parse(json))
   } catch {
     case e: Exception =>
-      Logger.error(s"failed parsing json document:\n${json.take(100)}", e)
+      Logger.error(s"failed parsing json document:%n${json.take(100)}".format(), e)
       None
   }
 }
