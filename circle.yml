@@ -14,7 +14,7 @@ dependencies:
     - ~/pine/target/resolution-cache
 test:
   override:
-    - ls
+    - sbt scalastyle
   post:
     - sbt universal:package-zip-tarball
     - cp target/universal/*.tgz $CIRCLE_ARTIFACTS
