@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import com.codahale.metrics.json.MetricsModule
 import com.fasterxml.jackson.databind.{ObjectMapper, ObjectWriter}
 import com.yammer.metrics.reporting.DatadogReporter
-import models.{Metrics, ZkKafka}
+import models.{KafkaMessageReader, Metrics, ZkKafka}
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 import play.api.Play.current
@@ -55,11 +55,15 @@ object Application extends Controller {
   }
 
   def topo(name: String, topoRoot: String, topic: String): Action[AnyContent] = Action { implicit request =>
-
     val totalsAndDeltas = ZkKafka.getTopologyDeltas(topoRoot, topic)
     val dateFormat = DateTimeFormat.fullDateTime()
     val generatedAt = new DateTime().toString(dateFormat)
     Ok(views.html.topology(name, topic, totalsAndDeltas._1, totalsAndDeltas._2, generatedAt))
+  }
+
+  def message(topic: String, partition: Int, offset: Long): Action[AnyContent] = Action { implicit request =>
+    val content = KafkaMessageReader.getMessageContent(topic, partition, offset)
+    Ok(views.html.messageAtOffset(topic, partition, offset, content))
   }
 
   def metrics: Action[AnyContent] = Action {

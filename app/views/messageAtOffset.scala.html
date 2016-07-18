@@ -1,0 +1,18 @@
+@(topic: String, partition: Int, offset: Long, content: String)(implicit request: play.api.mvc.RequestHeader)
+
+@main("Capillary") {
+
+    <h1>Showing message from topic "@topic", partition "@partition", and offset "@offset"</h1>
+
+    <div class="row-fluid">
+        <div class="col-md-12">
+            <code>@content</code>
+        </div>
+    </div>
+
+    <div class="row-fluid">
+        <div class="col-md-1"><a href="@routes.Application.message(topic, partition, offset-1)">Previous</a></div>
+        <div class="col-md-1"><a href="@routes.Application.message(topic, partition, offset+1)">Next</a></div>
+    </div>
+
+}

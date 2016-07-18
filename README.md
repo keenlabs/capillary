@@ -11,6 +11,7 @@ Capillary does the following:
 * Fetches information about the topic's partitions and offsets from the Storm spout state in Zookeeper
 * Fetches information about the partition's leaders from Zookeeper
 * Fetches information from Kafka about the latest offset from the partitions leaders
+* Optionally displays messages from Kafka.
 
 # API
 
@@ -74,9 +75,9 @@ If your Kafka chroots to a subdirectory (or whatever it's called) in Zookeeper t
 
 If your Storm chroots to a subdirectory (or whatever it's called) in Zookeeper then you'll want to set this. We use 'keen-storm'.
 
-### capillary.use.trident
+### capillary.kafkas
 
-Set this to true if you would like to monitor trident topologies instead of pure storm. This will modify the Zookeeper paths used to match Trident's convention.
+Set this to a list of your Kafkas (looks like: `sjc01-staging-kafka-0000:9092,sjc01-staging-kafka-0001:9092,sjc01-staging-kafka-0002:9092,sjc01-staging-kafka-0003:9092,sjc01-staging-kafka-0004:9092`)
 
 ###
 
