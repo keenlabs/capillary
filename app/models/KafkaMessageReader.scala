@@ -51,37 +51,43 @@ object KafkaMessageReader {
   }
 
   private def mapToPartitionMetadata(simpleConsumer: SimpleConsumer, topic: String): Seq[PartitionMetadata] = {
-    val topicMetadataRequest = new TopicMetadataRequest(Seq(topic), 0)
-    val topicMetadataResponse = simpleConsumer.send(topicMetadataRequest)
-    simpleConsumer.close()
-    topicMetadataResponse.topicsMetadata.flatMap(_.partitionsMetadata)
+    try {
+      val topicMetadataRequest = new TopicMetadataRequest(Seq(topic), 0)
+      val topicMetadataResponse = simpleConsumer.send(topicMetadataRequest)
+      topicMetadataResponse.topicsMetadata.flatMap(_.partitionsMetadata)
+    } finally {
+      simpleConsumer.close()
+    }
   }
 
   private def readMessage(partitionMetadata: PartitionMetadata, topic: String, offset: Long): String = {
     partitionMetadata.leader.map { leadBroker =>
       val simpleConsumer = new SimpleConsumer(leadBroker.host, leadBroker.port, Timeout, BufferSize, ClientId)
-      val fetchRequest = new FetchRequestBuilder()
-        .clientId(ClientId)
-        .addFetch(topic, partitionMetadata.partitionId, offset, BufferSize)
-        .build()
-      val fetchResponse = simpleConsumer.fetch(fetchRequest)
-      simpleConsumer.close()
-      fetchResponse match {
-        case fr if fr.hasError =>
-          val errorMessage = s"Error while fetching from topic: $topic and offset: $offset. " +
-            s"Error code: ${fetchResponse.errorCode(topic, partitionMetadata.partitionId)}"
-          Logger.error(errorMessage)
-          errorMessage
-        case fr =>
-          val bytes: Option[Array[Byte]] = fetchResponse
-            .messageSet(topic, partitionMetadata.partitionId)
-            .headOption
-            .map(_.message.payload)
-            .map(bufferToArray)
-          bytes match {
-            case Some(b) => readBytesAsGzippedString(b).getOrElse(readBytesAsString(b))
-            case None => ""
-          }
+      try {
+        val fetchRequest = new FetchRequestBuilder()
+          .clientId(ClientId)
+          .addFetch(topic, partitionMetadata.partitionId, offset, BufferSize)
+          .build()
+        val fetchResponse = simpleConsumer.fetch(fetchRequest)
+        fetchResponse match {
+          case fr if fr.hasError =>
+            val errorMessage = s"Error while fetching from topic: $topic and offset: $offset. " +
+              s"Error code: ${fetchResponse.errorCode(topic, partitionMetadata.partitionId)}"
+            Logger.error(errorMessage)
+            errorMessage
+          case fr =>
+            val bytes: Option[Array[Byte]] = fetchResponse
+              .messageSet(topic, partitionMetadata.partitionId)
+              .headOption
+              .map(_.message.payload)
+              .map(bufferToArray)
+            bytes match {
+              case Some(b) => readBytesAsGzippedString(b).getOrElse(readBytesAsString(b))
+              case None => ""
+            }
+        }
+      } finally {
+        simpleConsumer.close()
       }
     }.getOrElse("No partition leader found")
   }
