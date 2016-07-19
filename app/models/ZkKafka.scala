@@ -26,7 +26,6 @@ object ZkKafka {
   val zookeepers = Play.configuration.getString("capillary.zookeepers").getOrElse("localhost:2181")
   val kafkaZkRoot = Play.configuration.getString("capillary.kafka.zkroot")
   val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot")
-  val isTrident = Play.configuration.getString("capillary.use.trident").getOrElse(false)
 
   private val SleepTimeMs = 1000
   private val MaxRetries = 3
@@ -38,8 +37,12 @@ object ZkKafka {
     parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) }).replace("//", "/")
   }
 
+  /**
+    * this function is a bit vestigial. it's from when we supported trident, which we no longer used, so we removed the special
+    * case code to simplify capillary. this method may be useful again someday, so we're keeping it.
+    */
   def applyBase(path: Seq[Option[String]]): Seq[Option[String]] = {
-    if (isTrident.equals("true")) path ++ Seq(Some("user")) else path
+    path
   }
 
   def getTopologies: Seq[Topology] = {
@@ -52,10 +55,8 @@ object ZkKafka {
     val maybeData = Option(zkClient.getData.forPath(path))
 
     // log a message if we get a null result for a path read
-    maybeData.map(Option(_)).filter(_.isEmpty).foreach(_ => Logger.warn(s"null data retrieved for path $path"))
-
     if (maybeData.isEmpty) {
-      Logger.error("Zookeeper Path " + path + " returned (null)!")
+      Logger.error(s"Zookeeper Path $path returned (null)!")
     }
     maybeData
   }
