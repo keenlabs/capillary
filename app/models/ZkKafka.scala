@@ -55,10 +55,8 @@ object ZkKafka {
     val maybeData = Option(zkClient.getData.forPath(path))
 
     // log a message if we get a null result for a path read
-    maybeData.map(Option(_)).filter(_.isEmpty).foreach(_ => Logger.warn(s"null data retrieved for path $path"))
-
     if (maybeData.isEmpty) {
-      Logger.error("Zookeeper Path " + path + " returned (null)!")
+      Logger.error(s"Zookeeper Path $path returned (null)!")
     }
     maybeData
   }
