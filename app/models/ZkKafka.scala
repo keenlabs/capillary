@@ -87,7 +87,7 @@ object ZkKafka {
     s.asScala.flatMap({ pts =>
       // Fetch the partition information
       val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
-      // For each partition, fetch the offsets.
+      // For each partition, fetch the offsets, and collapse down the valid results into the return value
       parts.asScala.flatMap { p =>
         val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
         tryParse(jsonState).map { state =>
@@ -95,8 +95,6 @@ object ZkKafka {
           val partition = (state \ "partition").as[Long]
           partition.toInt -> offset
         }
-
-        // collapse down the valid results into the return value
       }
     }).toMap
   }
@@ -139,8 +137,6 @@ object ZkKafka {
           }
         }
       }.getOrElse(None)
-
-      // collapse down the valid results into the return value
     }.toMap
   }
 

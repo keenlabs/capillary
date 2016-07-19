@@ -15,6 +15,7 @@ dependencies:
 test:
   override:
     - sbt scalastyle
+    - sbt test
   post:
     - sbt universal:package-zip-tarball
     - cp target/universal/*.tgz $CIRCLE_ARTIFACTS

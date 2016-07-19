@@ -17,14 +17,16 @@ import scala.language.implicitConversions
 
 object Application extends Controller {
 
+  val DefaultString = "default"
+  val SecondsString = "SECONDS"
   val validUnits = Some(Set("NANOSECONDS", "MICROSECONDS", "MILLISECONDS", "SECONDS", "MINUTES", "HOURS", "DAYS"))
   val mapper = new ObjectMapper()
 
-  def registryName: String = Play.configuration.getString("capillary.metrics.name").getOrElse("default")
+  def registryName: String = Play.configuration.getString("capillary.metrics.name").getOrElse(DefaultString)
 
-  def rateUnit: String = Play.configuration.getString("capillary.metrics.rateUnit", validUnits).getOrElse("SECONDS")
+  def rateUnit: String = Play.configuration.getString("capillary.metrics.rateUnit", validUnits).getOrElse(SecondsString)
 
-  def durationUnit: String = Play.configuration.getString("capillary.metrics.durationUnit", validUnits).getOrElse("SECONDS")
+  def durationUnit: String = Play.configuration.getString("capillary.metrics.durationUnit", validUnits).getOrElse(SecondsString)
 
   def showSamples: Boolean = Play.configuration.getBoolean("capillary.metrics.showSamples").getOrElse(false)
 
@@ -33,16 +35,13 @@ object Application extends Controller {
   val module = new MetricsModule(rateUnit, durationUnit, showSamples)
   mapper.registerModule(module)
 
-  ddAPIKey match {
-    case Some(apiKey) =>
-      Logger.info("Starting Datadog Reporter")
-      val reporter = new DatadogReporter.Builder()
-        .withApiKey(apiKey)
-        // .withMetricNameFormatter(ShortenedNameFormatter)
-        .build()
-      val period = 20L
-      reporter.start(period, TimeUnit.SECONDS)
-    case _ => Unit
+  ddAPIKey.foreach { apiKey =>
+    Logger.info("Starting Datadog Reporter")
+    val reporter = new DatadogReporter.Builder()
+      .withApiKey(apiKey)
+      .build()
+    val period = 20L
+    reporter.start(period, TimeUnit.SECONDS)
   }
 
   implicit def stringToTimeUnit(s: String): TimeUnit = TimeUnit.valueOf(s)
