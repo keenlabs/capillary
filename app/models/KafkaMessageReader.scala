@@ -1,6 +1,7 @@
 package models
 
 import java.io.{ByteArrayInputStream, InputStreamReader}
+import java.nio.ByteBuffer
 import java.util.zip.{GZIPInputStream, ZipException}
 
 import com.google.common.io.CharStreams
@@ -29,69 +30,65 @@ object KafkaMessageReader {
   }
 
   private def findLeader(kafkaHosts: Array[String], topic: String, partition: Int): Option[PartitionMetadata] = {
-    var simpleConsumer: Option[SimpleConsumer] = None
-    try {
-      for (kafkaHost <- kafkaHosts) {
-        val hostAndPort = kafkaHost.split(":")
-        val host = hostAndPort(0)
-        val port = hostAndPort(1).toInt
-        simpleConsumer = Some(new SimpleConsumer(host, port, Timeout, BufferSize, ClientId))
-        val topicMetadataRequest = new TopicMetadataRequest(Seq(topic), 0)
-        val topicMetadataResponse = simpleConsumer.get.send(topicMetadataRequest)
-        for (topicMetadata <- topicMetadataResponse.topicsMetadata) {
-          for (partitionMetadata <- topicMetadata.partitionsMetadata) {
-            if (partitionMetadata.partitionId == partition) {
-              Logger.debug(s"FoundPartitionMetadata, p=$partitionMetadata")
-              // scalastyle:off return
-              return Some(partitionMetadata)
-              // scalastyle:on return
-            }
-          }
-        }
-      }
-    } finally {
-      if (simpleConsumer.isDefined) {
-        simpleConsumer.get.close()
-      }
-    }
+    val partitionMetadata: Option[PartitionMetadata] = kafkaHosts
+      // split up connecting string so we can separate host from port
+      .map(_.split(":"))
+      // set up tuples like (host, port)
+      .map { hostAndPort => (hostAndPort(0), hostAndPort(1).toInt) }
+      // take a view of it so we don't evaluate the whole thing
+      .view
+      // build the consumer
+      .map { t => new SimpleConsumer(t._1, t._2, Timeout, BufferSize, ClientId) }
+      // get the possible partition metadata
+      .flatMap(mapToPartitionMetadata(_, topic))
+      // see if we can find one that matches
+      .find(_.partitionId == partition)
 
-    Logger.error("No partition found")
-    None
+    if (partitionMetadata.isEmpty) {
+      Logger.error("No partition found")
+    }
+    partitionMetadata
+  }
+
+  private def mapToPartitionMetadata(simpleConsumer: SimpleConsumer, topic: String): Seq[PartitionMetadata] = {
+    val topicMetadataRequest = new TopicMetadataRequest(Seq(topic), 0)
+    val topicMetadataResponse = simpleConsumer.send(topicMetadataRequest)
+    simpleConsumer.close()
+    topicMetadataResponse.topicsMetadata.flatMap(_.partitionsMetadata)
   }
 
   private def readMessage(partitionMetadata: PartitionMetadata, topic: String, offset: Long): String = {
     val leadBroker = partitionMetadata.leader.get
     val simpleConsumer = new SimpleConsumer(leadBroker.host, leadBroker.port, Timeout, BufferSize, ClientId)
-    try {
-      val fetchRequest = new FetchRequestBuilder()
-        .clientId(ClientId)
-        .addFetch(topic, partitionMetadata.partitionId, offset, BufferSize)
-        .build()
-      val fetchResponse = simpleConsumer.fetch(fetchRequest)
-      if (fetchResponse.hasError) {
+    val fetchRequest = new FetchRequestBuilder()
+      .clientId(ClientId)
+      .addFetch(topic, partitionMetadata.partitionId, offset, BufferSize)
+      .build()
+    val fetchResponse = simpleConsumer.fetch(fetchRequest)
+    simpleConsumer.close()
+    fetchResponse match {
+      case fr if fr.hasError =>
         val errorMessage = s"Error while fetching from topic: $topic and offset: $offset. " +
           s"Error code: ${fetchResponse.errorCode(topic, partitionMetadata.partitionId)}"
         Logger.error(errorMessage)
-        // scalastyle:off return
-        return errorMessage
-        // scalastyle:on return
-      }
-
-      val messagesAndOffsets = fetchResponse.messageSet(topic, partitionMetadata.partitionId)
-      messagesAndOffsets.headOption.map { messageAndOffset =>
-        val payload = messageAndOffset.message.payload
-        val bytes = new Array[Byte](payload.limit())
-        payload.get(bytes)
-        val str = readBytesAsGzippedString(bytes).getOrElse(readBytesAsString(bytes))
-        // scalastyle:off return
-        return str
-        // scalastyle:on return
-      }
-    } finally {
-      simpleConsumer.close()
+        errorMessage
+      case fr =>
+        val bytes: Option[Array[Byte]] = fetchResponse
+          .messageSet(topic, partitionMetadata.partitionId)
+          .headOption
+          .map(_.message.payload)
+          .map(bufferToArray)
+        bytes match {
+          case Some(b) => readBytesAsGzippedString(b).getOrElse(readBytesAsString(b))
+          case None => ""
+        }
     }
+  }
 
-    ""
+  private def bufferToArray(byteBuffer: ByteBuffer): Array[Byte] = {
+    val bytes = new Array[Byte](byteBuffer.limit())
+    byteBuffer.get(bytes)
+    bytes
   }
 
   private def readBytesAsString(bytes: Array[Byte]) = {
