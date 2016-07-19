@@ -7,14 +7,16 @@ dependencies:
     - sudo dpkg -i sbt-0.13.7.deb
     - wget -q http://downloads.typesafe.com/scala/2.11.7/scala-2.11.7.deb
     - sudo dpkg -i scala-2.11.7.deb
+  override:
+    - sbt update
   cache_directories:
     - ~/.ivy2
     - ~/.sbt
     - ~/.m2
-    - ~/pine/target/resolution-cache
 test:
   override:
-    - ls
+    - sbt scalastyle
+    - sbt test
   post:
     - sbt universal:package-zip-tarball
     - cp target/universal/*.tgz $CIRCLE_ARTIFACTS

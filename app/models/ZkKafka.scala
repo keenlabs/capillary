@@ -1,20 +1,22 @@
 package models
 
-import kafka.api.{OffsetFetchRequest,OffsetRequest,PartitionOffsetRequestInfo}
+import kafka.api.{OffsetRequest, PartitionOffsetRequestInfo}
 import kafka.common.TopicAndPartition
 import kafka.consumer.SimpleConsumer
 import org.apache.curator.framework.CuratorFrameworkFactory
-import org.apache.curator.framework.recipes.cache.PathChildrenCache
 import org.apache.curator.retry.ExponentialBackoffRetry
-import play.api.libs.json._
-import play.api.Logger
-import play.api.Play
+import play.api.{Logger, Play}
 import play.api.Play.current
+import play.api.libs.json._
+
 import scala.collection.JavaConverters._
 
 object ZkKafka {
+
   case class Totals(total: Long, kafkaTotal: Long, spoutTotal: Long)
+
   case class Delta(partition: Int, amount: Option[Long], current: Long, storm: Option[Long])
+
   case class Topology(name: String, spoutRoot: String, topic: String)
 
   def topoCompFn(t1: Topology, t2: Topology): Boolean = {
@@ -24,34 +26,37 @@ object ZkKafka {
   val zookeepers = Play.configuration.getString("capillary.zookeepers").getOrElse("localhost:2181")
   val kafkaZkRoot = Play.configuration.getString("capillary.kafka.zkroot")
   val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot")
-  val isTrident = Play.configuration.getString("capillary.use.trident").getOrElse(false)
 
-  val retryPolicy = new ExponentialBackoffRetry(1000, 3)
-  val zkClient = CuratorFrameworkFactory.newClient(zookeepers, retryPolicy);
-  zkClient.start();
+  private val SleepTimeMs = 1000
+  private val MaxRetries = 3
+  val retryPolicy = new ExponentialBackoffRetry(SleepTimeMs, MaxRetries)
+  val zkClient = CuratorFrameworkFactory.newClient(zookeepers, retryPolicy)
+  zkClient.start()
 
   def makePath(parts: Seq[Option[String]]): String = {
-    parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) }).replace("//","/")
+    parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) }).replace("//", "/")
   }
 
+  /**
+    * this function is a bit vestigial. it's from when we supported trident, which we no longer used, so we removed the special
+    * case code to simplify capillary. this method may be useful again someday, so we're keeping it.
+    */
   def applyBase(path: Seq[Option[String]]): Seq[Option[String]] = {
-    if(isTrident.equals("true")) path ++ Seq(Some("user")) else path
+    path
   }
 
   def getTopologies: Seq[Topology] = {
-    zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.map({ r =>
+    zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.flatMap { r =>
       getSpoutTopology(r)
-    }).flatten.sortWith(topoCompFn)
+    }.sortWith(topoCompFn)
   }
 
   def getZkData(path: String): Option[Array[Byte]] = {
     val maybeData = Option(zkClient.getData.forPath(path))
 
     // log a message if we get a null result for a path read
-    maybeData.filter(_ == null).foreach(_ => Logger.warn(s"null data retrieved for path $path"))
-
-    if ( maybeData.isEmpty ) {
-      Logger.error("Zookeeper Path " + path + " returned (null)!")
+    if (maybeData.isEmpty) {
+      Logger.error(s"Zookeeper Path $path returned (null)!")
     }
     maybeData
   }
@@ -69,7 +74,7 @@ object ZkKafka {
           state <- tryParse(zkData)
         } yield {
           val topic = (state \ "topic").as[String]
-          val name  = (state \ "topology" \ "name").as[String]
+          val name = (state \ "topology" \ "name").as[String]
           Topology(name = name, topic = topic, spoutRoot = root)
         }
       })
@@ -83,17 +88,15 @@ object ZkKafka {
     s.asScala.flatMap({ pts =>
       // Fetch the partition information
       val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
-      // For each partition, fetch the offsets.
-      parts.asScala.map({ p =>
+      // For each partition, fetch the offsets, and collapse down the valid results into the return value
+      parts.asScala.flatMap { p =>
         val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
         tryParse(jsonState).map { state =>
           val offset = (state \ "offset").as[Long]
           val partition = (state \ "partition").as[Long]
-          (partition.toInt -> offset)
+          partition.toInt -> offset
         }
-
-      // collapse down the valid results into the return value
-      }).flatten
+      }
     }).toMap
   }
 
@@ -101,7 +104,7 @@ object ZkKafka {
     // Fetch info for each partition, given the topic
     val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
     // For each partition fetch the JSON state data to find the leader for each partition
-    kParts.asScala.map({ kp =>
+    kParts.asScala.flatMap { kp =>
       val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
       tryParse(jsonState).flatMap { state =>
         val leader = (state \ "leader").as[Long]
@@ -112,39 +115,39 @@ object ZkKafka {
           val host = (leaderState \ "host").as[String]
           val port = (leaderState \ "port").as[Int]
 
+          val socketTimeout = 1000000
+          val bufferSize = 64 * 1024
           // Talk to the lead broker and get offset data!
-          val ks = new SimpleConsumer(host, port, 1000000, 64*1024, "capillary")
+          val ks = new SimpleConsumer(host, port, socketTimeout, bufferSize, "capillary")
           val topicAndPartition = TopicAndPartition(topic, kp.toInt)
           val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
-            topicAndPartition -> new PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
+            topicAndPartition -> PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
           )
           val request = new OffsetRequest(
             requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
-          val response = ks.getOffsetsBefore(request);
+          val response = ks.getOffsetsBefore(request)
 
           // in case of error, lets log some info and cease processing this partition rather than failing in the following map lookup
           if (response.hasError) {
-            Logger.error("failed retrieving offsets for topic $topic and partition $kp, response was $response");
+            Logger.error("failed retrieving offsets for topic $topic and partition $kp, response was $response")
             None
           } else {
-            val offset = response.partitionErrorAndOffsets(topicAndPartition).offsets(0)
+            val offset = response.partitionErrorAndOffsets(topicAndPartition).offsets.head
             ks.close
             Some(kp.toInt -> offset)
           }
         }
       }.getOrElse(None)
-
-    // collapse down the valid results into the return value
-    }).flatten.toMap
+    }.toMap
   }
 
-  def getTopologyDeltas(topoRoot: String, topic: String): Tuple2[Totals, List[Delta]] = {
+  def getTopologyDeltas(topoRoot: String, topic: String): (Totals, List[Delta]) = {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
     val zkState = ZkKafka.getKafkaState(topic)
-    var total = 0L;
-    var kafkaTotal = 0L;
-    var spoutTotal = 0L;
+    var total = 0L
+    var kafkaTotal = 0L
+    var spoutTotal = 0L
     val deltas = zkState.map({ partAndOffset =>
       val partition = partAndOffset._1
       val koffset = partAndOffset._2
@@ -157,12 +160,12 @@ object ZkKafka {
         spoutTotal = soffset + spoutTotal
         Delta(partition = partition, amount = Some(amount), current = koffset, storm = Some(soffset))
       }).getOrElse({
-        Logger.error(s"Storm State unavailable for partition ${partition}")
+        Logger.error(s"Storm State unavailable for partition $partition")
         Delta(partition = partition, amount = None, current = koffset, storm = None)
       })
     }).toList.sortBy(_.partition)
 
-    (new Totals(total, kafkaTotal, spoutTotal), deltas)
+    (Totals(total, kafkaTotal, spoutTotal), deltas)
   }
 
   // Attempt to parse a byte array as json, and catch and log any error rather than
@@ -171,7 +174,8 @@ object ZkKafka {
     Some(Json.parse(json))
   } catch {
     case e: Exception =>
-      Logger.error(s"failed parsing json document:%n${json.take(100)}".format(), e)
+      val max_num_chars_for_error: Int = 100
+      Logger.error(s"failed parsing json document:%n${json.take(max_num_chars_for_error)}".format(), e)
       None
   }
 }

@@ -13,16 +13,16 @@
     <tbody>
       <tr class="info">
        <td>All</td>
-       <td>Total: @total.total</th>
-       <td>&nbsp;</th>
-       <td>&nbsp;</th>
+       <td>Total: @total.total</td>
+       <td>&nbsp;</td>
+       <td>&nbsp;</td>
       </tr>
       @for(delta <- deltas) {
       <tr>
        <td>@delta.partition</td>
-       <td>@delta.amount</th>
-       <td>@delta.current</th>
-       <td>@delta.storm</th>
+       <td>@delta.amount</td>
+       <td><a href="@routes.Application.message(topic, delta.partition, delta.current)">@delta.current</a></td>
+       <td><a href="@routes.Application.message(topic, delta.partition, delta.storm.getOrElse(0L))">@delta.storm</a></td>
       </tr>
       }
     </tbody>

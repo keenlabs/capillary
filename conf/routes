@@ -6,6 +6,7 @@
 GET     /                           controllers.Application.index
 GET     /metrics                    controllers.Application.metrics
 GET     /topo                       controllers.Application.topo(name: String, toporoot: String, topic: String)
+GET     /message                    controllers.Application.message(topic: String, partition: Int, offset: Long)
 
 GET     /api/status                 controllers.api.Status.current(toporoot: String, topic: String)
 
