@@ -19,7 +19,7 @@ dependencies:
   # Compile here so that the dependencies can be cached between builds and to make sure the code
   # actually compiles before we do a bunch of other work.
   override:
-    - sbt test:compile it:compile
+    - sbt test:compile
 
 # Use this section to setup tests external dependencies, not just databases.
 database:
@@ -28,7 +28,7 @@ database:
 
 test:
   override:
-    - sbt test it:test scalastyle
+    - sbt test scalastyle
   post:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit/
     - cp target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
