@@ -1,14 +1,10 @@
 general:
+  # Artifacts that we want to collect from the build such as test results and logs
   artifacts:
-    - "multiproject/target/universal"
-    - "multiproject/target/specs2-reports"
-    - "multiproject/target/test-reports"
-    - "play/target/universal"
-    - "play/target/specs2-reports"
-    - "play/target/test-reports"
-    - "scala-lib/target/universal"
-    - "scala-lib/target/specs2-reports"
-    - "scala-lib/target/test-reports"
+    - "target/universal"
+    - "target/specs2-reports"
+    - "target/test-reports"
+    - "logs"
 
 machine:
   java:
@@ -20,38 +16,36 @@ dependencies:
   pre:
     - wget -q https://dl.bintray.com/sbt/debian/sbt-0.13.12.deb
     - sudo dpkg -i sbt-0.13.12.deb
+  # Compile here so that the dependencies can be cached between builds and to make sure the code
+  # actually compiles before we do a bunch of other work.
   override:
-    - cd multiproject; sbt test:compile it:compile ft:compile
-    - cd play; sbt test:compile it:compile
-    - cd scala-lib; sbt test:compile it:compile ft:compile
+    - sbt test:compile it:compile
+
+# Use this section to setup tests external dependencies, not just databases.
+database:
+  override:
+    - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
 
 test:
   override:
-    - cd multiproject; sbt test it:test ft:test scalastyle
-    - cd play; sbt test it:test scalastyle
-    - cd scala-lib; sbt test it:test ft:test scalastyle
+    - sbt test it:test scalastyle
   post:
-    - cd play; sbt universal:package-zip-tarball
     - mkdir -p $CIRCLE_TEST_REPORTS/junit/
-    #- cp multiproject/core/target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
-    #- cp multiproject/json/target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
-    - cp play/target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
-    - cp scala-lib/target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
+    - cp target/test-reports/*.xml $CIRCLE_TEST_REPORTS/junit/
 
 deployment:
+  # Only package and build a docker image if the tests pass.
   hub:
     branch: /^(?!master).*/
     commands:
-      - cd scala-lib; sbt publish
-      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - sbt universal:package-zip-tarball
       - docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
       - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:$CIRCLE_BRANCH
       - docker push keen/capillary
-  artifacts:
+  master:
     branch: master
     commands:
-      - cd scala-lib; sbt publish
-      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - sbt universal:package-zip-tarball
       - docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
       - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:latest
       - docker push keen/capillary
