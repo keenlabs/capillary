@@ -1,5 +1,5 @@
 FROM keen/oraclejdk8
-MAINTAINER Terry Horner <terry@keen.io> 
+MAINTAINER Terry Horner <community@keen.io>
 
 # Copy in the artifact
 COPY target/universal/capillary-*.tgz /capillary/
