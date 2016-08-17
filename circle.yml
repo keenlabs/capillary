@@ -47,5 +47,5 @@ deployment:
     commands:
       - sbt universal:package-zip-tarball
       - docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
-      - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:latest
+      - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:master
       - docker push keen/capillary
