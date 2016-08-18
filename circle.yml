@@ -36,16 +36,9 @@ test:
 deployment:
   # Only package and build a docker image if the tests pass.
   hub:
-    branch: /^(?!master).*/
+    branch: /.*/
     commands:
       - sbt universal:package-zip-tarball
       - docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
       - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:$CIRCLE_BRANCH
-      - docker push keen/capillary
-  master:
-    branch: master
-    commands:
-      - sbt universal:package-zip-tarball
-      - docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
-      - docker tag -f keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:master
       - docker push keen/capillary
