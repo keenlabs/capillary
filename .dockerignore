@@ -1,0 +1,12 @@
+.idea/
+.git/
+app/
+conf/
+docs/
+logs/
+project/
+public/
+src/
+#target/
+#!target/universal/*.tgz
+test/

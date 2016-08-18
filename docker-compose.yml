@@ -1,0 +1,9 @@
+version: "2.0"
+
+services:
+  # Keen Services
+  capillary:
+    build: .
+    command: -Dconfig.resource=application-docker.conf
+    ports:
+      - "9000:9000"
