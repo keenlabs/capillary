@@ -17,25 +17,55 @@ def report_stats(host, topology, toporoot, topic):
 
         data = json.loads(state)
 
-        amount = 0
+        total_delta = 0
+        total_kafka_current = 0
+        total_spout_current = 0
         for looplord in data:
             if looplord['amount'] is not None:
+                partition_tags = [
+                    "topic:{}".format(topic),
+                    "topology:{}".format(topology),
+                    "partition:{}".format(looplord['partition'])
+                ]
                 statsd.gauge(
                     'razor.kafkamon.topology.partition',
                     looplord['amount'],
-                    tags = [
-                        "topic:{}".format(topic),
-                        "topology:{}".format(topology),
-                        "partition:{}".format(looplord['partition'])
-                    ]
+                    tags = partition_tags
                 )
-                amount += looplord['amount']
+                total_delta += looplord['amount']
+                statsd.gauge(
+                    'razor.kafkamon.topology.partition.kafka.current',
+                    looplord['current'],
+                    tags = partition_tags
+                )
+                total_kafka_current += looplord['current']
+                statsd.gauge(
+                    'razor.kafkamon.topology.partition.spout.current',
+                    looplord['storm'],
+                    tags = partition_tags
+                )
+                total_spout_current += looplord['storm']
 
-        print "Got {} for {}".format(amount, topology)
+        print "Got amount={}, kafka current={}, spout current={} for {}".format(
+                total_delta, total_kafka_current, total_spout_current, topology)
 
         statsd.gauge(
             'razor.kafkamon.total_delta',
-            amount, tags = [
+            total_delta, tags = [
+                "topic:{}".format(topic),
+                "topology:{}".format(topology)
+            ]
+        )
+        statsd.gauge(
+            'razor.kafkamon.total_kafka_current',
+            total_kafka_current, tags = [
+                "topic:{}".format(topic),
+                "topology:{}".format(topology)
+            ]
+        )
+        statsd.gauge(
+            'razor.kafkamon.total_spout_current',
+            total_spout_current, tags = [
                 "topic:{}".format(topic),
                 "topology:{}".format(topology)
             ]
