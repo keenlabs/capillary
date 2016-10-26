@@ -49,26 +49,21 @@ def report_stats(host, topology, toporoot, topic):
         print "Got amount={}, kafka current={}, spout current={} for {}".format(
                 total_delta, total_kafka_current, total_spout_current, topology)
 
+        total_tags = [
+            "topic:{}".format(topic),
+            "topology:{}".format(topology)
+        ]
         statsd.gauge(
             'razor.kafkamon.total_delta',
-            total_delta, tags = [
-                "topic:{}".format(topic),
-                "topology:{}".format(topology)
-            ]
+            total_delta, tags = total_tags
         )
         statsd.gauge(
             'razor.kafkamon.total_kafka_current',
-            total_kafka_current, tags = [
-                "topic:{}".format(topic),
-                "topology:{}".format(topology)
-            ]
+            total_kafka_current, tags = total_tags
         )
         statsd.gauge(
             'razor.kafkamon.total_spout_current',
-            total_spout_current, tags = [
-                "topic:{}".format(topic),
-                "topology:{}".format(topology)
-            ]
+            total_spout_current, tags = total_tags
         )
 
 host = sys.argv[1]
