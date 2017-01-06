@@ -1,6 +1,6 @@
 resolvers ++= Seq(
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
+  "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
 )
 
 // The Play plugin
