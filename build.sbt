@@ -20,7 +20,9 @@ libraryDependencies ++= Seq(
   "org.apache.curator" % "curator-framework" % "2.6.0",
   "org.apache.curator" % "curator-recipes" % "2.6.0",
   "org.coursera" % "metrics-datadog" % "0.1.7",
-  specs2 % Test
+  specs2 % Test,
+  "org.specs2" % "specs2-junit_2.10" % "3.8.6-scalaz-7.1" % Test,
+  "org.specs2" % "specs2-scalacheck_2.10" % "3.8.6-scalaz-7.1" % Test
 )
 
 mappings in Universal += file("stats-to-datadog.py") -> "stats-to-datadog.py"
