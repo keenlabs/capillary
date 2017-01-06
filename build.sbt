@@ -23,4 +23,6 @@ libraryDependencies ++= Seq(
   specs2 % Test
 )
 
+resolvers += "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
+
 mappings in Universal += file("stats-to-datadog.py") -> "stats-to-datadog.py"
