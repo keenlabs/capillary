@@ -1,4 +1,4 @@
-FROM keen/oraclejdk8
+FROM openjdk:8
 MAINTAINER Terry Horner <community@keen.io>
 
 # Copy in the artifact
