@@ -4,7 +4,7 @@ MAINTAINER Terry Horner <community@keen.io>
 WORKDIR /capillary
 
 # Copy in the artifact
-COPY target/universal/capillary-*.tgz .
+COPY target/universal/capillary-*.tgz ./
 
 # Extract and link the artifact
 RUN tar zxvf *.tgz && \
