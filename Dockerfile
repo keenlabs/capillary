@@ -1,14 +1,15 @@
-FROM keen/oraclejdk8
+FROM openjdk:8
 MAINTAINER Terry Horner <community@keen.io>
 
+WORKDIR /capillary
+
 # Copy in the artifact
-COPY target/universal/capillary-*.tgz /capillary/
+COPY target/universal/capillary-*.tgz ./
 
 # Extract and link the artifact
-WORKDIR /capillary
-RUN tar zxvf *.tgz
-RUN rm -f *.tgz
-RUN ln -s `ls` current
+RUN tar zxvf *.tgz && \
+    rm -f *.tgz && \
+    ln -s `ls` current
 
 # Included container configuration
 EXPOSE 8086
