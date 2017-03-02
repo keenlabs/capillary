@@ -1,6 +1,6 @@
 name := """capillary"""
 
-version := "1.2"
+version := "2.0.0"
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala)
 
