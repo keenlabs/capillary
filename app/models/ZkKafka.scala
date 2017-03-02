@@ -124,7 +124,8 @@ object ZkKafka {
     val kParts = zkKafkaClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
     // For each partition fetch the JSON state data to find the leader for each partition
     kParts.asScala.flatMap { kp =>
-      val jsonState = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
+      val jsonState = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"),
+        Some(kp), Some("state"))))
       tryParse(jsonState).flatMap { state =>
         val leader = (state \ "leader").as[Long]
 
