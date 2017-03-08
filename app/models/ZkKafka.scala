@@ -3,12 +3,11 @@ package models
 import kafka.api.{OffsetRequest, PartitionOffsetRequestInfo}
 import kafka.common.TopicAndPartition
 import kafka.consumer.SimpleConsumer
-import org.apache.curator.framework.CuratorFrameworkFactory
+import org.apache.curator.framework.{CuratorFramework, CuratorFrameworkFactory}
 import org.apache.curator.retry.ExponentialBackoffRetry
 import play.api.{Logger, Play}
 import play.api.Play.current
 import play.api.libs.json._
-
 import scala.collection.JavaConverters._
 
 object ZkKafka {
@@ -24,14 +23,34 @@ object ZkKafka {
   }
 
   val zookeepers = Play.configuration.getString("capillary.zookeepers").getOrElse("localhost:2181")
-  val kafkaZkRoot = Play.configuration.getString("capillary.kafka.zkroot")
-  val stormZkRoot = Play.configuration.getString("capillary.storm.zkroot")
+  val kafkaZookeepers = Play.configuration.getString("capillary.kafka.zookeepers").getOrElse(zookeepers)
+  val stormZookeepers = Play.configuration.getString("capillary.storm.zookeepers").getOrElse(zookeepers)
+
+  // converts the empty string to None
+  private def getConfigStringHandleEmpty(configName: String): Option[String] = Play.configuration.getString(configName) match {
+    case Some("") => None
+    case x => x
+  }
+
+  val kafkaZkRoot = getConfigStringHandleEmpty("capillary.kafka.zkroot")
+  val stormZkRoot = getConfigStringHandleEmpty("capillary.storm.zkroot")
 
   private val SleepTimeMs = 1000
   private val MaxRetries = 3
   val retryPolicy = new ExponentialBackoffRetry(SleepTimeMs, MaxRetries)
-  val zkClient = CuratorFrameworkFactory.newClient(zookeepers, retryPolicy)
-  zkClient.start()
+  Logger.info(s"Kafka: starting new curator client to: $kafkaZookeepers")
+  val zkKafkaClient = CuratorFrameworkFactory.newClient(kafkaZookeepers, retryPolicy)
+  zkKafkaClient.start()
+  // only build a new ZK client for storm if it connects to a different ZK cluster
+  val zkStormClient = if (kafkaZookeepers != stormZookeepers) {
+    Logger.info(s"Storm: starting new curator client to: $stormZookeepers")
+    val newClient = CuratorFrameworkFactory.newClient(stormZookeepers, retryPolicy)
+    newClient.start()
+    newClient
+  } else {
+    Logger.info(s"Storm: using existing curator client to: $stormZookeepers")
+    zkKafkaClient
+  }
 
   def makePath(parts: Seq[Option[String]]): String = {
     parts.foldLeft("")({ (path, maybeP) => maybeP.map({ p => path + "/" + p }).getOrElse(path) }).replace("//", "/")
@@ -46,31 +65,31 @@ object ZkKafka {
   }
 
   def getTopologies: Seq[Topology] = {
-    zkClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.flatMap { r =>
+    zkStormClient.getChildren.forPath(makePath(Seq(stormZkRoot))).asScala.flatMap { r =>
       getSpoutTopology(r)
     }.sortWith(topoCompFn)
   }
 
-  def getZkData(path: String): Option[Array[Byte]] = {
+  def getZkData(zkClient: CuratorFramework, path: String): Option[Array[Byte]] = {
     val maybeData = Option(zkClient.getData.forPath(path))
 
     // log a message if we get a null result for a path read
     if (maybeData.isEmpty) {
-      Logger.error(s"Zookeeper Path $path returned (null)!")
+      Logger.error(s"Zookeeper Server ${zkClient.getZookeeperClient.getCurrentConnectionString} Path $path returned (null)!")
     }
     maybeData
   }
 
   def getSpoutTopology(root: String): Option[Topology] = {
     // Fetch the spout root
-    zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))))).asScala.flatMap({ spout =>
-      zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)))).asScala.flatMap({ part =>
+    zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))))).asScala.flatMap({ spout =>
+      zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)))).asScala.flatMap({ part =>
         // Fetch the partitions so we can pick the first one
         val path = makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(spout)) ++ Seq(Some(part)))
         // Use the first partition's data to build up info about the topology
         // Also, don't trust zk to have valid JSON, it may be null or something...
         for {
-          zkData <- getZkData(path)
+          zkData <- getZkData(zkStormClient, path)
           state <- tryParse(zkData)
         } yield {
           val topic = (state \ "topic").as[String]
@@ -83,14 +102,14 @@ object ZkKafka {
 
   def getSpoutState(root: String, topic: String): Map[Int, Long] = {
     // There is basically nothing for error checking in here.
-    val s = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))
+    val s = zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))
     // This gets us to the spout root
     s.asScala.flatMap({ pts =>
       // Fetch the partition information
-      val parts = zkClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
+      val parts = zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))
       // For each partition, fetch the offsets, and collapse down the valid results into the return value
       parts.asScala.flatMap { p =>
-        val jsonState = zkClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
+        val jsonState = zkStormClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p))))
         tryParse(jsonState).map { state =>
           val offset = (state \ "offset").as[Long]
           val partition = (state \ "partition").as[Long]
@@ -102,15 +121,16 @@ object ZkKafka {
 
   def getKafkaState(topic: String): Map[Int, Long] = {
     // Fetch info for each partition, given the topic
-    val kParts = zkClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
+    val kParts = zkKafkaClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
     // For each partition fetch the JSON state data to find the leader for each partition
     kParts.asScala.flatMap { kp =>
-      val jsonState = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"), Some(kp), Some("state"))))
+      val jsonState = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"),
+        Some(kp), Some("state"))))
       tryParse(jsonState).flatMap { state =>
         val leader = (state \ "leader").as[Long]
 
         // Knowing the leader's ID, fetch info about that host so we can contact it.
-        val idJson = zkClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
+        val idJson = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
         tryParse(idJson).map { leaderState =>
           val host = (leaderState \ "host").as[String]
           val port = (leaderState \ "port").as[Int]
