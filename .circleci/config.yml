@@ -1,0 +1,59 @@
+defaults: &defaults
+  working_directory: ~/capillary
+  docker:
+    - image: keen/build-scala:master
+
+version: 2
+
+jobs:
+
+  scalastyle:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Scalastyle
+          command: sbt scalastyle
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run:
+          name: Compile
+          command: sbt test:compile
+      - run:
+          name: Test
+          command: sbt test
+      - store_artifacts:
+          path: target/test-reports/
+  push:
+    <<: *defaults
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Docker login
+          command: docker login -u $DOCKER_USER -p $DOCKER_PASS
+      - run:
+          name: Docker build container
+          command: |
+              sbt universal:package-zip-tarball
+              docker build -t keen/capillary:$CIRCLE_BUILD_NUM .
+      - run:
+          name: Docker push container
+          command: |
+              docker tag keen/capillary:$CIRCLE_BUILD_NUM keen/capillary:$CIRCLE_BRANCH
+              docker push keen/capillary
+
+workflows:
+  version: 2
+  scalastyle_test_push:
+    jobs:
+      - scalastyle
+      - test
+      - push:
+          requires:
+            - scalastyle
+            - test
+
+
