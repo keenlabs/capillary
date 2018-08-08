@@ -119,27 +119,53 @@ object ZkKafka {
     }).toMap
   }
 
-  def getKafkaState(topic: String): Map[Int, Long] = {
-    // Fetch info for each partition, given the topic
-    val kParts = zkKafkaClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
-    // For each partition fetch the JSON state data to find the leader for each partition
-    kParts.asScala.flatMap { kp =>
-      val jsonState = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"),
-        Some(kp), Some("state"))))
-      tryParse(jsonState).flatMap { state =>
-        val leader = (state \ "leader").as[Long]
-
-        // Knowing the leader's ID, fetch info about that host so we can contact it.
-        val idJson = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
-        tryParse(idJson).map { leaderState =>
-          val host = (leaderState \ "host").as[String]
-          val port = (leaderState \ "port").as[Int]
+  /**
+    * Instead of parsing in kafka-main zookeeper:
+    *  --> brokers/topics/TOPIC/partitions/PARTITION/state.LEADER
+    * then
+    *  --> brokers/ids/LEADER
+    * to read host and port
+    *
+    * Use data from topology definition in Storm Zookeeper:
+    * "topology":{
+    *   "id":"0e318d74-ad8c-4c90-9fdd-625ce4622ac1",
+    *   "name":"write_event8"
+    *   },
+    *   "offset":11164197691,
+    *   "partition":9,
+    *   "broker":{
+    *     "host":"172.31.152.92",
+    *     "port":9092},
+    *   "topic":"migration"
+    * }
+    *
+    * keen_storm/ -- level 0
+    *   forward_event.backup_to_main-migration/ -- level 1
+    *     forward_event.backup_to_main-migration/ -- level 2
+    *       partition_0
+    *       partition_1
+    *       ...
+    *       partition_15
+    */
+  def getKafkaState(root: String, topic: String): Map[Int, Long] = {
+    val s = zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root)))))  // level 0
+    // This gets us to the spout root
+    s.asScala.flatMap{ pts =>
+      // Fetch the partition information
+      val parts = zkStormClient.getChildren.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts))))  // level 1
+      // For each partition, fetch the host and port
+      parts.asScala.flatMap { p =>
+        val jsonState = zkStormClient.getData.forPath(makePath(applyBase(Seq(stormZkRoot, Some(root))) ++ Seq(Some(pts)) ++ Seq(Some(p)))) // level 2
+        tryParse(jsonState).map { state =>
+          val partition = (state \ "partition").as[Int]
+          val host = (state \ "broker" \ "host").as[String]
+          val port = (state \ "broker" \ "port").as[Int]
 
           val socketTimeout = 1000000
           val bufferSize = 64 * 1024
           // Talk to the lead broker and get offset data!
           val ks = new SimpleConsumer(host, port, socketTimeout, bufferSize, "capillary")
-          val topicAndPartition = TopicAndPartition(topic, kp.toInt)
+          val topicAndPartition = TopicAndPartition(topic, partition)
           val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
             topicAndPartition -> PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
           )
@@ -149,15 +175,15 @@ object ZkKafka {
 
           // in case of error, lets log some info and cease processing this partition rather than failing in the following map lookup
           if (response.hasError) {
-            Logger.error("failed retrieving offsets for topic $topic and partition $kp, response was $response")
+            Logger.error("failed retrieving offsets for topic $topic and partition $partition, response was $response")
             None
           } else {
             val offset = response.partitionErrorAndOffsets(topicAndPartition).offsets.head
             ks.close
-            Some(kp.toInt -> offset)
+            Some(partition -> offset)
           }
-        }
-      }.getOrElse(None)
+        }.getOrElse(None)
+      }
     }.toMap
   }
 
