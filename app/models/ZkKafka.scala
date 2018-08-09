@@ -190,7 +190,7 @@ object ZkKafka {
   def getTopologyDeltas(topoRoot: String, topic: String): (Totals, List[Delta]) = {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
-    val zkState = ZkKafka.getKafkaState(topic)
+    val zkState = ZkKafka.getKafkaState(topoRoot, topic)
     var total = 0L
     var kafkaTotal = 0L
     var spoutTotal = 0L
