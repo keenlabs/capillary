@@ -160,6 +160,7 @@ object ZkKafka {
           val partition = (state \ "partition").as[Int]
           val host = (state \ "broker" \ "host").as[String]
           val port = (state \ "broker" \ "port").as[Int]
+          Logger.info(s"Partition: '$partition', host: '$host', port: '$port'")
 
           val socketTimeout = 1000000
           val bufferSize = 64 * 1024
@@ -187,10 +188,60 @@ object ZkKafka {
     }.toMap
   }
 
+  def getKafkaState2(topic: String): Map[Int, Long] = {
+    // Fetch info for each partition, given the topic
+    val kParts = zkKafkaClient.getChildren.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"))))
+    // For each partition fetch the JSON state data to find the leader for each partition
+    kParts.asScala.flatMap { kp =>
+      val jsonState = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/topics"), Some(topic), Some("partitions"),
+        Some(kp), Some("state"))))
+      tryParse(jsonState).flatMap { state =>
+        val leader = (state \ "leader").as[Long]
+
+        // Knowing the leader's ID, fetch info about that host so we can contact it.
+        val idJson = zkKafkaClient.getData.forPath(makePath(Seq(kafkaZkRoot, Some("brokers/ids"), Some(leader.toString))))
+        tryParse(idJson).map { leaderState =>
+          val host = (leaderState \ "host").as[String]
+          val port = (leaderState \ "port").as[Int]
+          Logger.info(s"Partition: '$kp', host: '$host', port: '$port'")
+
+          val socketTimeout = 5000
+          val bufferSize = 64 * 1024
+          // Talk to the lead broker and get offset data!
+          val ks = new SimpleConsumer(host, port, socketTimeout, bufferSize, "capillary")
+          val topicAndPartition = TopicAndPartition(topic, kp.toInt)
+          val requestInfo = Map[TopicAndPartition, PartitionOffsetRequestInfo](
+            topicAndPartition -> PartitionOffsetRequestInfo(OffsetRequest.LatestTime, 1)
+          )
+          val request = new OffsetRequest(
+            requestInfo = requestInfo, versionId = OffsetRequest.CurrentVersion, clientId = "capillary")
+          val response = ks.getOffsetsBefore(request)
+
+          // in case of error, lets log some info and cease processing this partition rather than failing in the following map lookup
+          if (response.hasError) {
+            Logger.error("failed retrieving offsets for topic $topic and partition $kp, response was $response")
+            None
+          } else {
+            val offset = response.partitionErrorAndOffsets(topicAndPartition).offsets.head
+            ks.close
+            Some(kp.toInt -> offset)
+          }
+        }
+      }.getOrElse(None)
+    }.toMap
+  }
+
   def getTopologyDeltas(topoRoot: String, topic: String): (Totals, List[Delta]) = {
     val stormState = ZkKafka.getSpoutState(topoRoot, topic)
 
+    Logger.info(s"KafkaState:")
     val zkState = ZkKafka.getKafkaState(topoRoot, topic)
+    Logger.info(s"KafkaState: '$zkState'")
+
+    Logger.info(s"KafkaState2:")
+    val zkKafkaState = getKafkaState2(topic)
+    Logger.info(s"KafkaState2: '$zkKafkaState'")
+
     var total = 0L
     var kafkaTotal = 0L
     var spoutTotal = 0L
