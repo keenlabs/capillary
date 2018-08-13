@@ -55,5 +55,3 @@ workflows:
           requires:
             - scalastyle
             - test
-
-
