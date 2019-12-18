@@ -33,21 +33,9 @@ def report_stats(host, topology, toporoot, topic):
                     tags = partition_tags
                 )
                 total_delta += looplord['amount']
-                statsd.gauge(
-                    'razor.kafkamon.topology.partition.kafka.current',
-                    looplord['current'],
-                    tags = partition_tags
-                )
-                total_kafka_current += looplord['current']
-                statsd.gauge(
-                    'razor.kafkamon.topology.partition.spout.current',
-                    looplord['storm'],
-                    tags = partition_tags
-                )
-                total_spout_current += looplord['storm']
 
-        print "Got amount={}, kafka current={}, spout current={} for {}".format(
-                total_delta, total_kafka_current, total_spout_current, topology)
+        print "Got amount={}, for {}".format(
+                total_delta, topology)
 
         total_tags = [
             "topic:{}".format(topic),
